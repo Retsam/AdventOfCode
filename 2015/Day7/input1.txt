@@ -1,0 +1,7 @@
+a AND aa -> bb
+4 -> a
+5 -> aa
+4 AND 5 -> b
+4 OR 5 -> c
+4 LSHIFT 1 -> d
+4 RSHIFT 1 -> e

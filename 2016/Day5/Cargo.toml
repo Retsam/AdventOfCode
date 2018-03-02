@@ -1,0 +1,7 @@
+[package]
+name = "Day5"
+version = "0.1.0"
+authors = ["Ben Nelson <Ben.Nelson@inin.com>"]
+
+[dependencies]
+rust-crypto = "^0.2"
