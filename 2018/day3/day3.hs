@@ -62,7 +62,7 @@ runParser parser input =
     case readP_to_S parser input of
         -- Should be exactly one result, which consumes the entire
         [(xs, "")] -> xs
-        [(xs, _)] -> error "Didn't consume whoe input"
+        [(xs, _)] -> error "Didn't consume whole input"
         _ -> error "Input parse error"
 
 parseInt :: ReadP Int
