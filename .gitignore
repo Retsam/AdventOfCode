@@ -4,3 +4,5 @@ dist
 out
 .lein-repl-history
 .hgignore
+*.hi
+*.o
