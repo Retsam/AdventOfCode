@@ -2,6 +2,7 @@ import Control.Monad.Writer
 import Control.Monad
 import Data.List
 import Data.Maybe
+import Data.Function (on)
 
 data Dir = North | South | East | West deriving (Show, Eq, Ord)
 data NextTurn = L | S | R deriving (Show, Eq, Ord)
@@ -17,19 +18,17 @@ flipTuple (a, b) = (b, a)
 
 -- Track Running
 run :: Track -> [Cart] -> Coord
-run track carts = case step track carts of
-    Left collision -> collision
-    Right newCarts -> run track newCarts
+run track = fst3 . head . fromJust . (find $ (<=1) . length) . iterate (step track)
 
-step :: Track -> [Cart] -> Either Coord [Cart]
-step track carts = foldM (step' track) carts (sort carts)
+step :: Track -> [Cart] -> [Cart]
+step track carts = foldl (step' track) carts (sort carts)
 
-step' :: Track -> [Cart] -> Cart -> Either Coord [Cart]
+step' :: Track -> [Cart] -> Cart -> [Cart]
 step' track prevCarts cart =
-    let
-        newCarts = (delete cart prevCarts) ++ [moveCart track cart]
-        maybeCollision = hasCollision newCarts
-    in maybe (Right newCarts) Left maybeCollision
+    -- Make sure we're not trying to step a cart that's already been removed in a collision
+    if cart `elem` prevCarts then
+        removeCollision $ (delete cart prevCarts) ++ [moveCart track cart]
+    else prevCarts
 
 
 moveCart :: Track -> Cart -> Cart
@@ -51,8 +50,8 @@ moveCart track (coord, dir, nextTurn)
 getSegment :: Track -> Coord -> Char
 getSegment track (row, col) = track !! row !! col
 
-hasCollision :: [Cart] -> Maybe Coord
-hasCollision =  fmap head . find ((>1) . length) . group . sort . map fst3
+removeCollision :: [Cart] -> [Cart]
+removeCollision =  concat . filter ((==1) . length) . groupBy ((==) `on` fst3) . sort
 
 fst3 :: (a, b, c) -> a
 fst3 (a, _, _) = a
