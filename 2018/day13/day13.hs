@@ -1,30 +1,41 @@
 import Control.Monad.Writer
+import Control.Monad
 import Data.List
 import Data.Maybe
 
-data Dir = North | South | East | West deriving Show
-data NextTurn = L | S | R deriving Show
+data Dir = North | South | East | West deriving (Show, Eq, Ord)
+data NextTurn = L | S | R deriving (Show, Eq, Ord)
 type Coord = (Int, Int)
 type Cart = (Coord, Dir, NextTurn)
 
 type Track = [String]
 
--- Note, output is backwards from puzzle (3,7) vs (7,3)
-main = getContents >>= putStrLn . show . (uncurry run). runWriter . parseTrack
+-- FIXME: Move carts one at a time, in order, not all at once
+
+main = getContents >>= putStrLn . show . flipTuple . (uncurry run). runWriter . parseTrack
 -- main = getContents >>= mapM (putStrLn . show) . (uncurry run). runWriter . parseTrack
+
+flipTuple (a, b) = (b, a)
 
 -- Track Running
 run :: Track -> [Cart] -> Coord
-run track = head . mapMaybe hasCollision . iterate (step track)
+run track carts = case step track carts of
+    Left collision -> collision
+    Right newCarts -> run track newCarts
 
--- run :: Track -> [Cart] -> [[Cart]]
--- run track = takeWhile (isNothing . hasCollision ) . iterate (step track)
+step :: Track -> [Cart] -> Either Coord [Cart]
+step track carts = foldM (step' track) carts (sort carts)
 
-step :: Track -> [Cart] -> [Cart]
-step track = map (step' track)
+step' :: Track -> [Cart] -> Cart -> Either Coord [Cart]
+step' track prevCarts cart =
+    let
+        newCarts = (delete cart prevCarts) ++ [moveCart track cart]
+        maybeCollision = hasCollision newCarts
+    in maybe (Right newCarts) Left maybeCollision
 
-step' :: Track -> Cart -> Cart
-step' track (coord, dir, nextTurn)
+
+moveCart :: Track -> Cart -> Cart
+moveCart track (coord, dir, nextTurn)
     = case (getSegment track coord) of
         '|' -> move dir nextTurn
         '-' -> move dir nextTurn
