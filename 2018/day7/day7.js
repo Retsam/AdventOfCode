@@ -1,3 +1,5 @@
+const _ = require("lodash");
+
 const lines = `Step C must be finished before step A can begin.
 Step C must be finished before step F can begin.
 Step A must be finished before step B can begin.
@@ -108,7 +110,7 @@ Step P must be finished before step K can begin.
 Step A must be finished before step D can begin.
 Step B must be finished before step P can begin.`.split('\n');
 
-const input = lines.map(line => {
+const input = lines2.map(line => {
     const words = line.split(" ");
     return [words[1], words[7]];
 })
