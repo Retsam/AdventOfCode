@@ -1,14 +1,14 @@
-import Data.Sequence (Seq (..), fromList, (><))
+import Data.Sequence (Seq (..), fromList, (><), (|>))
 import qualified Data.Sequence as Seq
 import Data.Foldable (toList)
 import Data.Maybe (fromJust)
 import Data.List
 import Data.Char
 
--- numRecipes = 20000 -- example
+-- numRecipes = 59414 -- example
 numRecipes = 825401 -- puzzle input
 
-main = putStrLn $ run initState
+main = putStrLn $ show $ part2 initState
 
 type Score = String
 data State = State
@@ -24,11 +24,27 @@ initState = State {
     elf1 = 0,
     elf2 = 1
 }
-run :: State -> Score
-run state =
+part1 :: State -> Score
+part1 state =
     case skillHasImproved state of
         True -> score state
-        False -> run (step state)
+        False -> part1 (step state)
+
+
+part2 :: State -> Int
+part2 state =
+    let
+        p = fromList (digits numRecipes)
+        (rs :|> r) = recipes state
+    in
+        if matchesPattern p rs then (length rs) - (length p)
+        else if matchesPattern p (rs |> r) then (length rs) - (length p) + 1
+        else part2 (step state)
+
+matchesPattern :: Seq Int -> Seq Int -> Bool
+matchesPattern Empty _ = True
+matchesPattern (ps :|> p) (rs :|> r) = (r == p) && matchesPattern ps rs
+matchesPattern _ _ = False
 
 
 step :: State -> State
