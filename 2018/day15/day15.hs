@@ -1,47 +1,64 @@
 import Data.List
 import Data.Function
 import Data.Ord
-import Data.Maybe (catMaybes, listToMaybe)
+import Data.Maybe (catMaybes, listToMaybe, isNothing, fromJust)
 import qualified Data.Set as Set
 import Data.Set (Set)
 import qualified Data.Sequence as Seq
 import Data.Sequence (Seq (..), (><))
 import Debug.Trace
 
+main = interact (show . fromJust . find battleOver . (iterate tick) . parseInput)
+
 data Race = Goblin | Elf deriving (Show, Ord, Eq)
 type Pos = (Int, Int) -- Row, Col
 type Path = [Pos]
 
 data Mob = Mob
-    { pos :: Pos
+    { pos :: Pos -- First, so mobs sort on position by default
     , race :: Race
-    } deriving (Show, Ord, Eq)
+    , hp :: Int
+    , mobId :: String
+    } deriving (Show, Ord)
+instance Eq Mob where
+    (==) = ((==) `on` mobId)
+
+newMob :: Race -> Pos -> Mob
+newMob r p = Mob
+    { race = r
+    , pos = p
+    , mobId = show p
+    , hp = 200 }
 
 type IsOpen = Pos -> Bool
 
-main = interact (show . tick . parseInput)
-
 -- Readability aliases
 type AllMobs = [Mob]
-newtype GameState = GameState ([Pos], AllMobs)
+type RoundCount = Int
+data GameState = GameState ([Pos], AllMobs, RoundCount)
 instance Show GameState where
     show state = showState state
 
 showState :: GameState -> String
-showState state@(GameState (squares, mobs)) =
+showState state@(GameState (squares, mobs, t)) =
     let
         minRow = minimum $ fst <$> squares
         minCol = minimum $ snd <$> squares
         maxRow = maximum $ fst <$> squares
         maxCol = maximum $ snd <$> squares
     in
+        "ROUND " ++ show t ++ "\n" ++
         unlines [[showSquare state (r, c)
             | c <- [(minCol - 1)..(maxCol + 1)]]
             | r <- [(minRow - 1)..(maxRow + 1)]
-        ]
+        ] ++ (
+            unlines (showHealth <$> sort mobs)
+        ) ++ (
+            "Score: " ++ (show $ scoreBattle state) ++ " * (" ++ show t ++ " or " ++ show (t-1) ++ ")\n"
+        )
 
 showSquare :: GameState -> Pos -> Char
-showSquare (GameState (squares, mobs)) p =
+showSquare (GameState (squares, mobs, _)) p =
     case find ((==p) . pos) mobs of
         Just Mob { race = r } -> case r of
             Goblin -> 'G'
@@ -49,50 +66,104 @@ showSquare (GameState (squares, mobs)) p =
         Nothing -> if (p `elem` squares) then '.' else '#'
 
 
+showMob :: Mob -> String
+showMob (Mob { pos = p, race = r}) =
+    (show r) ++ " " ++ (show p)
+
+showHealth :: Mob -> String
+showHealth mob =
+    showMob mob ++ " - " ++ (show $ hp mob)
+
 squares :: GameState -> [Pos]
-squares (GameState (s, _)) = s
+squares (GameState (s, _, _)) = s
 mobs :: GameState -> AllMobs
-mobs (GameState (_, m)) = m
+mobs (GameState (_, m, _)) = m
+
 
 -- squares = [(x,y) | x <- [0..3], y <- [0..3]]
 -- mobs = [Mob {race=Elf, pos=(1,2)}, Mob {race=Goblin, pos=(0,0)}, Mob {race=Elf, pos=(3,3)}]
-_mobs = [Mob { race=Elf, pos=(0,0)}, Mob {race=Goblin, pos=(3,1)}]
+_mobs = [ newMob Elf (0,0), newMob Goblin (3,1)]
 _squares = [
     (0,0), (0,1), (0,2),
     (1,0),        (1,2),
     (2,0),        (2,2),
     (3,0), (3,1), (3,2)]
-_state = GameState (_squares, _mobs)
+_state = GameState (_squares, _mobs, 0)
 _isOpen = squareIsOpen _state
 
 tick :: GameState -> GameState
-tick state = foldl takeTurn state (sort $ mobs $ state)
+tick state =
+    let
+        GameState (newSquares, newMobs, t) =  foldl takeTurn state (sort $ mobs $ state)
+    in GameState (newSquares, newMobs, t + 1)
+
+battleOver :: GameState -> Bool
+battleOver (GameState (_, mobs, _)) =
+    (<2) $ length $ nub $ race <$> mobs
+
+scoreBattle :: GameState -> Int
+scoreBattle (GameState (_, mobs, t)) =
+    (sum $ hp <$> mobs)
+
 
 takeTurn :: GameState -> Mob -> GameState
 takeTurn state mob =
-    case adjacentTarget state mob of
-        Just enemy -> trace (show mob ++ " attacks " ++ show enemy) state  -- Todo: attack
-        Nothing -> doMove state mob
+    -- Check if its died since the round began
+    case tapTrace (getSelf state mob) of
+        Nothing -> state -- You died, sorry
+        Just me -> case adjacentTarget state me of
+            Just enemy -> doAttack' me state enemy
+            -- Using `me` not `mob` to ensure that the HP is up-to-date
+            Nothing ->
+                let
+                    newState = doMove state me
+                    newMe = fromJust $ getSelf newState me
+                in case adjacentTarget newState newMe of
+                    Nothing -> newState
+                    Just enemy -> doAttack' newMe newState enemy
+
+    where doAttack' me state enemy = trace (showHealth me ++ " attacks " ++ showHealth enemy) doAttack state enemy
+
+getSelf :: GameState -> Mob -> Maybe Mob
+getSelf (GameState (_, mobs, _)) mob = find (== mob) mobs
 
 doMove :: GameState -> Mob -> GameState
 doMove state mob =
     case moveTowardTarget state mob of
-        Nothing -> state
-        Just newPos -> updateMob state mob (mob { pos = newPos })
+        Nothing -> trace (showHealth mob ++ " stands still") state
+        Just newPos ->
+            trace (showHealth mob ++ " moves to " ++ show newPos)
+            (updateMob state (mob { pos = newPos }))
 
-updateMob :: GameState -> Mob -> Mob -> GameState
-updateMob (GameState (squares, mobs)) oldMob newMob =
+doAttack :: GameState -> Mob -> GameState
+doAttack state victim =
+    if (hp victim) > 3 then
+        updateMob state (victim { hp = (hp victim) - 3 })
+    else
+        killMob state victim
+
+updateMob :: GameState -> Mob -> GameState
+updateMob (GameState (squares, mobs, t)) newMob =
     let
-        newMobs = newMob:(delete oldMob mobs)
-    in GameState (squares, newMobs)
+        newMobs = newMob:(delete newMob mobs) -- Works since Eq on id
+    in GameState (squares, newMobs, t)
+
+killMob :: GameState -> Mob -> GameState
+killMob (GameState (squares, mobs, t)) victim =
+    GameState (squares, delete victim mobs, t)
+
 
 isAdjacent :: Mob -> Mob -> Bool
 isAdjacent m1 m2 =
     pos m1 `elem` (adjacentSquares $ pos m2)
 
+tapTrace t =
+    trace (show t) t
+
 adjacentTarget :: GameState -> Mob -> Maybe Mob
 adjacentTarget state mob =
-    listToMaybe $ sort
+    listToMaybe
+    $ (sortBy $ (comparing hp) `mappend` compare) -- Break ties in HP by position
     $ filter (isAdjacent mob)
     $ findTargets (mobs state) mob
 
@@ -122,7 +193,7 @@ findTargets allMobs mob =
     filter (((/=) `on` race) mob) allMobs
 
 squareIsOpen :: GameState -> Pos -> Bool
-squareIsOpen (GameState (squares, mobs)) p =
+squareIsOpen (GameState (squares, mobs, t)) p =
     p `elem` squares &&
     not (p `elem` (map pos mobs))
 
@@ -162,27 +233,28 @@ findPath isOpen from to =
 -- Parse Input
 parseInput :: String -> GameState
 parseInput input =
-    foldl parseLine (GameState ([], [])) (zip (lines input) [0..] )
+    foldl parseLine (GameState ([], [], 0)) (zip (lines input) [0..] )
 
 parseLine :: GameState -> (String, Int) -> GameState
 parseLine state (line, r) =
     foldl (parseChar r) state (zip line [0..])
 
 parseChar :: Int -> GameState -> (Char, Int) -> GameState
-parseChar r state@(GameState (squares, mobs)) (char, c) =
+parseChar r state@(GameState (squares, mobs, t)) (char, c) =
     case char of
         '#' -> state
-        '.' -> GameState ((p:squares), mobs)
-        'G' -> addChar state p Goblin
-        'E' -> addChar state p Elf
+        '.' -> GameState ((p:squares), mobs, t)
+        'G' -> addMob state p Goblin
+        'E' -> addMob state p Elf
         x -> error ("Unexpected char" ++ [x])
     where p = (r,c)
 
-addChar :: GameState -> Pos -> Race -> GameState
-addChar (GameState (squares, mobs)) pos race =
+addMob :: GameState -> Pos -> Race -> GameState
+addMob (GameState (squares, mobs, t)) pos race =
     GameState (
         (pos:squares),
-        ((Mob {pos=pos, race=race}):mobs)
+        ((newMob race pos):mobs),
+        t
     )
 
 --- BFS algorithm
