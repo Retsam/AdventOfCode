@@ -9,8 +9,9 @@ import qualified Data.Sequence as Seq
 import Data.Sequence (Seq (..), (><))
 import Debug.Trace
 
--- main = interact (show . fromJust . find battleOver . (iterate tick) . parseInput)
-main = interact (show . tick . parseInput)
+main = interact (show . fromJust . find battleOver . (iterate tick) . parseInput)
+-- main = interact (show . (!! 5) . (iterate tick) . parseInput)
+
 
 data Race = Goblin | Elf deriving (Show, Ord, Eq)
 type Pos = (Int, Int) -- Row, Col
@@ -37,6 +38,7 @@ type IsOpen = Pos -> Bool
 type AllMobs = [Mob]
 data GameState = GameState {
     squares :: Set Pos,
+    openSquares :: Set Pos,
     mobs :: [Mob],
     roundCount :: Int
 }
@@ -47,13 +49,17 @@ instance Show GameState where
 initState :: GameState
 initState = GameState {
     squares = Set.empty,
+    openSquares = Set.empty,
     mobs = [],
     roundCount = 0
 }
 
--- buildState :: Set Pos -> AllMobs -> RoundCount -> GameState
--- buildState pos mobs r ->
-    -- GameState pos mobs r
+updateEmptySquares :: GameState -> GameState
+updateEmptySquares state =
+    state { openSquares = openSquares }
+    where
+        occupiedSquares = Set.fromList $ pos <$> (mobs state)
+        openSquares = Set.difference (squares state) occupiedSquares
 
 showState :: GameState -> String
 showState state@(GameState {squares=squares, mobs=mobs, roundCount=t}) =
@@ -98,7 +104,7 @@ _squares = Set.fromList [
     (1,0),        (1,2),
     (2,0),        (2,2),
     (3,0), (3,1), (3,2)]
-_state = GameState {squares = _squares, mobs = _mobs, roundCount=0 }
+_state = GameState {squares = _squares, mobs = _mobs, roundCount=0, openSquares = Set.empty }
 _isOpen = squareIsOpen _state
 
 tick :: GameState -> GameState
@@ -108,8 +114,11 @@ tick state =
     in newState {roundCount=roundCount state + 1}
 
 battleOver :: GameState -> Bool
-battleOver (GameState {mobs}) =
-    (<2) $ length $ nub $ race <$> mobs
+battleOver (GameState {mobs}) = battleOver' mobs
+
+battleOver' :: [Mob] -> Bool
+battleOver' [] = True
+battleOver' (a:rest) = all (== a) rest
 
 scoreBattle :: GameState -> Int
 scoreBattle (GameState {mobs}) =
@@ -143,7 +152,7 @@ doMove state mob =
         Nothing -> trace (showHealth mob ++ " stands still") state
         Just newPos ->
             trace (showHealth mob ++ " moves to " ++ show newPos)
-            (updateMob state (mob { pos = newPos }))
+            updateEmptySquares (updateMob state (mob { pos = newPos }))
 
 doAttack :: GameState -> Mob -> GameState
 doAttack state victim =
@@ -184,9 +193,9 @@ moveTowardTarget gameState mob =
     head <$> getPath <$> path
     where
         path = bfs isGoal getNext (PathNode (pos mob, Nothing))
-        isGoal (PathNode (p1, _)) = p1 `elem` targetSquares
+        isGoal (PathNode (p1, _)) = p1 `Set.member` targetSquares
         getNext = getAdjacentNodes (squareIsOpen gameState)
-        targetSquares = findTargetSquares gameState mob
+        targetSquares = Set.fromList $ findTargetSquares gameState mob
 
 
 findTargetSquares :: GameState -> Mob -> [Pos]
@@ -202,11 +211,8 @@ findTargets allMobs mob =
     filter (((/=) `on` race) mob) allMobs
 
 squareIsOpen :: GameState -> Pos -> Bool
-squareIsOpen (GameState {squares, mobs}) p =
-    let
-        isSquare = p `Set.member` squares
-        isOccupied = p `elem` (map pos mobs)
-    in isSquare && not isOccupied
+squareIsOpen (GameState {openSquares}) p =
+    p `Set.member` openSquares
 
 adjacentSquares :: Pos -> [Pos]
 adjacentSquares (r, c) = [(r-1, c), (r, c-1), (r, c+1), (r+1, c)]
@@ -234,7 +240,7 @@ getPath' (PathNode (p, Just p2)) = (p:(getPath' p2))
 -- Parse Input
 parseInput :: String -> GameState
 parseInput input =
-    foldl parseLine initState (zip (lines input) [0..] )
+    updateEmptySquares $ foldl parseLine initState (zip (lines input) [0..] )
 
 parseLine :: GameState -> (String, Int) -> GameState
 parseLine state (line, r) =
@@ -269,7 +275,7 @@ bfs' test getNext visited (current :<| rest) =
         Just current
     else let
         newVisited = Set.insert current visited
-        nextItems = filter (not . (`Set.member` newVisited)) (getNext current)
+        nextItems = filter (`Set.notMember` newVisited) (getNext current)
         newFrontier = rest >< (Seq.fromList nextItems)
     in bfs' test getNext newVisited newFrontier
 
