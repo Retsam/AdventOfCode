@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 import Data.List
 import Data.Function
 import Data.Ord
@@ -8,7 +9,8 @@ import qualified Data.Sequence as Seq
 import Data.Sequence (Seq (..), (><))
 import Debug.Trace
 
-main = interact (show . fromJust . find battleOver . (iterate tick) . parseInput)
+-- main = interact (show . fromJust . find battleOver . (iterate tick) . parseInput)
+main = interact (show . tick . parseInput)
 
 data Race = Goblin | Elf deriving (Show, Ord, Eq)
 type Pos = (Int, Int) -- Row, Col
@@ -32,20 +34,34 @@ newMob r p = Mob
 
 type IsOpen = Pos -> Bool
 
--- Readability aliases
 type AllMobs = [Mob]
-type RoundCount = Int
-data GameState = GameState ([Pos], AllMobs, RoundCount)
+data GameState = GameState {
+    squares :: Set Pos,
+    mobs :: [Mob],
+    roundCount :: Int
+}
+
 instance Show GameState where
     show state = showState state
 
+initState :: GameState
+initState = GameState {
+    squares = Set.empty,
+    mobs = [],
+    roundCount = 0
+}
+
+-- buildState :: Set Pos -> AllMobs -> RoundCount -> GameState
+-- buildState pos mobs r ->
+    -- GameState pos mobs r
+
 showState :: GameState -> String
-showState state@(GameState (squares, mobs, t)) =
+showState state@(GameState {squares=squares, mobs=mobs, roundCount=t}) =
     let
-        minRow = minimum $ fst <$> squares
-        minCol = minimum $ snd <$> squares
-        maxRow = maximum $ fst <$> squares
-        maxCol = maximum $ snd <$> squares
+        minRow = minimum $ fst `Set.map` squares
+        minCol = minimum $ snd `Set.map` squares
+        maxRow = maximum $ fst `Set.map` squares
+        maxCol = maximum $ snd `Set.map` squares
     in
         "ROUND " ++ show t ++ "\n" ++
         unlines [[showSquare state (r, c)
@@ -58,7 +74,7 @@ showState state@(GameState (squares, mobs, t)) =
         )
 
 showSquare :: GameState -> Pos -> Char
-showSquare (GameState (squares, mobs, _)) p =
+showSquare (GameState {squares, mobs}) p =
     case find ((==p) . pos) mobs of
         Just Mob { race = r } -> case r of
             Goblin -> 'G'
@@ -74,42 +90,36 @@ showHealth :: Mob -> String
 showHealth mob =
     showMob mob ++ " - " ++ (show $ hp mob)
 
-squares :: GameState -> [Pos]
-squares (GameState (s, _, _)) = s
-mobs :: GameState -> AllMobs
-mobs (GameState (_, m, _)) = m
-
-
 -- squares = [(x,y) | x <- [0..3], y <- [0..3]]
 -- mobs = [Mob {race=Elf, pos=(1,2)}, Mob {race=Goblin, pos=(0,0)}, Mob {race=Elf, pos=(3,3)}]
 _mobs = [ newMob Elf (0,0), newMob Goblin (3,1)]
-_squares = [
+_squares = Set.fromList [
     (0,0), (0,1), (0,2),
     (1,0),        (1,2),
     (2,0),        (2,2),
     (3,0), (3,1), (3,2)]
-_state = GameState (_squares, _mobs, 0)
+_state = GameState {squares = _squares, mobs = _mobs, roundCount=0 }
 _isOpen = squareIsOpen _state
 
 tick :: GameState -> GameState
 tick state =
     let
-        GameState (newSquares, newMobs, t) =  foldl takeTurn state (sort $ mobs $ state)
-    in GameState (newSquares, newMobs, t + 1)
+        newState =  foldl takeTurn state (sort $ mobs $ state)
+    in newState {roundCount=roundCount state + 1}
 
 battleOver :: GameState -> Bool
-battleOver (GameState (_, mobs, _)) =
+battleOver (GameState {mobs}) =
     (<2) $ length $ nub $ race <$> mobs
 
 scoreBattle :: GameState -> Int
-scoreBattle (GameState (_, mobs, t)) =
+scoreBattle (GameState {mobs}) =
     (sum $ hp <$> mobs)
 
 
 takeTurn :: GameState -> Mob -> GameState
 takeTurn state mob =
     -- Check if its died since the round began
-    case tapTrace (getSelf state mob) of
+    case getSelf state mob of
         Nothing -> state -- You died, sorry
         Just me -> case adjacentTarget state me of
             Just enemy -> doAttack' me state enemy
@@ -125,7 +135,7 @@ takeTurn state mob =
     where doAttack' me state enemy = trace (showHealth me ++ " attacks " ++ showHealth enemy) doAttack state enemy
 
 getSelf :: GameState -> Mob -> Maybe Mob
-getSelf (GameState (_, mobs, _)) mob = find (== mob) mobs
+getSelf (GameState {mobs}) mob = find (== mob) mobs
 
 doMove :: GameState -> Mob -> GameState
 doMove state mob =
@@ -143,14 +153,12 @@ doAttack state victim =
         killMob state victim
 
 updateMob :: GameState -> Mob -> GameState
-updateMob (GameState (squares, mobs, t)) newMob =
-    let
-        newMobs = newMob:(delete newMob mobs) -- Works since Eq on id
-    in GameState (squares, newMobs, t)
+updateMob state newMob =
+    state { mobs = (newMob:(delete newMob (mobs state))) } -- Works since Eq on id
 
 killMob :: GameState -> Mob -> GameState
-killMob (GameState (squares, mobs, t)) victim =
-    GameState (squares, delete victim mobs, t)
+killMob state victim =
+    state { mobs = delete victim (mobs state) }
 
 
 isAdjacent :: Mob -> Mob -> Bool
@@ -173,12 +181,13 @@ sortPaths = sortBy $ (comparing length) `mappend` compare
 
 moveTowardTarget :: GameState -> Mob -> Maybe Pos
 moveTowardTarget gameState mob =
-    head <$> shortestPath
+    head <$> getPath <$> path
     where
-        isOpen = squareIsOpen gameState
+        path = bfs isGoal getNext (PathNode (pos mob, Nothing))
+        isGoal (PathNode (p1, _)) = p1 `elem` targetSquares
+        getNext = getAdjacentNodes (squareIsOpen gameState)
         targetSquares = findTargetSquares gameState mob
-        possiblePaths = catMaybes $ findPath isOpen (pos mob) <$> targetSquares
-        shortestPath = listToMaybe $ sortPaths $ possiblePaths
+
 
 findTargetSquares :: GameState -> Mob -> [Pos]
 findTargetSquares gameState =
@@ -193,16 +202,14 @@ findTargets allMobs mob =
     filter (((/=) `on` race) mob) allMobs
 
 squareIsOpen :: GameState -> Pos -> Bool
-squareIsOpen (GameState (squares, mobs, t)) p =
-    p `elem` squares &&
-    not (p `elem` (map pos mobs))
+squareIsOpen (GameState {squares, mobs}) p =
+    let
+        isSquare = p `Set.member` squares
+        isOccupied = p `elem` (map pos mobs)
+    in isSquare && not isOccupied
 
 adjacentSquares :: Pos -> [Pos]
 adjacentSquares (r, c) = [(r-1, c), (r, c-1), (r, c+1), (r+1, c)]
-
-dist :: IsOpen -> Pos -> Pos -> Int
-dist isOpen p1 p2 = length $ findPath isOpen p1 p2
-
 
 type PrevNode = Maybe PathNode
 newtype PathNode = PathNode (Pos, PrevNode) deriving (Show)
@@ -224,38 +231,31 @@ getPath' :: PathNode -> [Pos]
 getPath' (PathNode (p, Nothing)) = [] -- don't include the initial square in the path
 getPath' (PathNode (p, Just p2)) = (p:(getPath' p2))
 
-findPath :: IsOpen -> Pos -> Pos -> Maybe [Pos]
-findPath isOpen from to =
-    let
-        isTo = (== PathNode (to, Nothing))
-    in getPath <$> bfs isTo (getAdjacentNodes isOpen) (PathNode (from, Nothing))
-
 -- Parse Input
 parseInput :: String -> GameState
 parseInput input =
-    foldl parseLine (GameState ([], [], 0)) (zip (lines input) [0..] )
+    foldl parseLine initState (zip (lines input) [0..] )
 
 parseLine :: GameState -> (String, Int) -> GameState
 parseLine state (line, r) =
     foldl (parseChar r) state (zip line [0..])
 
 parseChar :: Int -> GameState -> (Char, Int) -> GameState
-parseChar r state@(GameState (squares, mobs, t)) (char, c) =
+parseChar r state (char, c) =
     case char of
         '#' -> state
-        '.' -> GameState ((p:squares), mobs, t)
+        '.' -> state {squares = Set.insert p (squares state)}
         'G' -> addMob state p Goblin
         'E' -> addMob state p Elf
         x -> error ("Unexpected char" ++ [x])
     where p = (r,c)
 
 addMob :: GameState -> Pos -> Race -> GameState
-addMob (GameState (squares, mobs, t)) pos race =
-    GameState (
-        (pos:squares),
-        ((newMob race pos):mobs),
-        t
-    )
+addMob state@(GameState {squares, mobs}) pos race =
+    state {
+        squares = Set.insert pos squares,
+        mobs = ((newMob race pos):mobs)
+    }
 
 --- BFS algorithm
 
@@ -272,3 +272,37 @@ bfs' test getNext visited (current :<| rest) =
         nextItems = filter (not . (`Set.member` newVisited)) (getNext current)
         newFrontier = rest >< (Seq.fromList nextItems)
     in bfs' test getNext newVisited newFrontier
+
+
+_input = "\n\
+\###############G.G.#############\n\
+\###############...G#############\n\
+\##############.....#############\n\
+\#############.G....#############\n\
+\############.......#############\n\
+\###########...##################\n\
+\###########G.###################\n\
+\#########....###################\n\
+\##########..####################\n\
+\##########G.###########...######\n\
+\###########.G.G.......#....#####\n\
+\###########...#####...#....#####\n\
+\###########..#######..G.....##.#\n\
+\###########.#########..........#\n\
+\######..###.#########.G.#.....##\n\
+\#####....#..#########....#######\n\
+\#####.......#########..#.##..###\n\
+\###..##.....#########..#.......#\n\
+\###..........#######...........#\n\
+\##..GG........#####G.......E...#\n\
+\#...#....G...........G.......E.#\n\
+\###.#...............E.EE.......#\n\
+\###..............G#E......E...##\n\
+\##.....G............#.....E..###\n\
+\#.G........G..............E..###\n\
+\#.#.....######.......E.......###\n\
+\##...G...#####....#..#.#..######\n\
+\#####..#...###....######..######\n\
+\#####.......##..########..######\n\
+\######....#.###########...######\n\
+\################################"
