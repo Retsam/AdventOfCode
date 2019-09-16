@@ -1,6 +1,8 @@
 {-# LANGUAGE NamedFieldPuns #-}
 import Data.Bits ((.|.), (.&.))
 import Data.Char (isNumber, isSpace)
+import Data.List (intersect, sortOn, (\\))
+import qualified Data.Map as Map
 import Text.ParserCombinators.ReadP (many, ReadP, munch, munch1, string, readP_to_S, sepBy, eof)
 
 type Instruction = (Opcode, Int, Int, Int)
@@ -25,17 +27,69 @@ data Opcode
     | Eqri -- Reg A = Val B
     | Eqir -- Val A = Reg B
     | Eqrr -- Reg A = Reg B
-    deriving (Show)
+    deriving (Show, Eq)
 
 allOps = [Addr, Addi, Mulr, Muli, Banr, Bani, Borr, Bori, Setr, Seti, Gtir, Gtri, Gtrr, Eqri, Eqir, Eqrr]
 
 main = do
     input <- getContents
     let (testcases, instructions) = runParser parseInput input
-    print $ length $ filter (>=3) $ map (length . opsMatchingTestcase) $ testcases
+    -- Part 1
+    -- print $ length $ filter (>=3) $ map (length . opsMatchingTestcase) $ testcases
+
+    -- All possibilities for each opcode, without doing elimination
+    let opcodePossibilities = foldl updateOpcodeMapping initOpcodeMapping testcases
+    let testcaseMapping = deriveOpcodeMapping opcodePossibilities
+    let knownInstructions = map (knownInstructionForUnknown testcaseMapping) instructions
+
+    let result = foldl doOp initRegisters knownInstructions
+    print result
+
+-- tcm :: [(Int, [Opcode])]
+-- tcm = [(0,[Mulr,Muli,Banr,Bani,Setr,Seti,Gtir,Gtri,Gtrr,Eqri]),(1,[Banr,Bani,Gtir,Gtri,Gtrr,Eqri,Eqir,Eqrr]),(2,[Addr,Addi,Seti]),(3,[Banr,Bani,Seti,Gtir,Gtri,Gtrr,Eqri,Eqir,Eqrr]),(4,[Gtri,Eqir,Eqrr]),(5,[Eqir]),(6,[Setr,Gtir]),(7,[Addr,Addi,Mulr,Muli,Banr,Bani,Borr,Bori,Setr,Seti,Gtir,Gtri,Gtrr]),(8,[Gtri,Gtrr,Eqir]),(9,[Gtri,Gtrr,Eqri,Eqir]),(10,[Gtir,Gtri,Gtrr,Eqri,Eqir,Eqrr]),(11,[Banr,Bani,Borr,Setr,Seti]),(12,[Addr,Bani,Borr,Setr,Seti,Gtir,Gtrr]),(13,[Gtrr,Eqir]),(14,[Mulr,Banr,Bani,Seti,Eqrr]),(15,[Banr,Gtir,Gtri,Gtrr,Eqri,Eqir,Eqrr])]
 
 -- tc :: Testcase
 -- tc = (Registers {r0 = 3, r1 = 2, r2 = 1, r3 = 1}, (9,2,1,2), Registers {r0 = 3, r1 = 2, r2 = 2, r3 = 1})
+
+---
+type PossibleOpcodeMapping = Map.Map Int [Opcode]
+type OpcodeMapping = Map.Map Int Opcode
+
+initOpcodeMapping :: PossibleOpcodeMapping
+initOpcodeMapping = Map.fromList $ map (\code -> (code, allOps)) [0..15]
+
+updateOpcodeMapping :: PossibleOpcodeMapping -> Testcase -> PossibleOpcodeMapping
+updateOpcodeMapping mapping tc =
+    let
+        (_, (opcode, _, _, _), _ ) = tc
+        matches = opsMatchingTestcase tc
+    in Map.adjust (intersect matches) opcode mapping
+
+updateMapWithKnownOpcode :: OpcodeMapping -> (Int, [Opcode]) -> OpcodeMapping
+updateMapWithKnownOpcode results (num, [code]) =
+    Map.insert num code results
+
+
+deriveOpcodeMapping :: PossibleOpcodeMapping -> OpcodeMapping
+deriveOpcodeMapping possibleMap =
+    _deriveOpcodeMapping (Map.toList possibleMap) (Map.empty)
+
+_deriveOpcodeMapping :: [(Int, [Opcode])] -> OpcodeMapping -> OpcodeMapping
+_deriveOpcodeMapping possibilities resultMap =
+    let
+        knownCodes = filter ((==1) . length . snd) possibilities
+        knownCodeNames = map (\(_, [code]) -> code) knownCodes
+        updatedResults = foldl updateMapWithKnownOpcode resultMap knownCodes
+        unknownCodes =
+            filter ((>0) . length . snd)
+            $ map (\(code, pos) -> (code, (pos \\ knownCodeNames))) possibilities
+    in if (length unknownCodes) == 0 then
+        updatedResults
+    else _deriveOpcodeMapping unknownCodes updatedResults
+
+knownInstructionForUnknown :: OpcodeMapping -> UnknownInstruction -> Instruction
+knownInstructionForUnknown mapping (code, a, b, c)
+    = ((mapping Map.! code), a, b, c)
 
 opsMatchingTestcase :: Testcase -> [Opcode]
 opsMatchingTestcase tc =
@@ -88,7 +142,7 @@ registerParser = do
 
 --- Registers implementation
 
-empty = Registers { r0 = 0, r1 = 1, r2 = 2, r3 = 3}
+initRegisters = Registers { r0 = 0, r1 = 1, r2 = 2, r3 = 3}
 
 data Registers
     = Registers {
