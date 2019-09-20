@@ -2,96 +2,96 @@
 import Data.Char (isNumber)
 import Text.ParserCombinators.ReadP (ReadP, readP_to_S, munch1, string, get, pfail, endBy, eof)
 import qualified Data.Map as Map
-
-converge :: Eq a => (a -> a) -> a -> a
-converge = until =<< ((==) =<<)
+import Data.Maybe (catMaybes)
 
 main = do
     input <- getContents
     let veins = runParser inputParser input
         tiles = buildGrid veins
         (_, _, minY, maxY) = gridRange tiles
-        fallFromOrigin = flip fall $ (500, minY)
-        result = fallFromOrigin Grid { --converge fallFromOrigin Grid {
-            tileMap = tiles,
-            gridMaxY = maxY
-        }
+        result = fall maxY tiles (500, minY)
 
     putStrLn $ showGrid result
-    print $ length $ filter (/= Clay) $  map snd $ Map.toList $ tileMap result
+    print $ length $ filter (/= Clay) $  map snd $ Map.toList $ result
 
 -- Filling logic
-isEmpty :: Grid -> Coord -> Bool
+
+isEmpty :: TileMap -> Coord -> Bool
 isEmpty grid coord =
-    case Map.lookup coord (tileMap grid) of
+    case Map.lookup coord grid of
         Nothing -> True
         Just FlowingWater -> True
         _ -> False
 
-fallFromOrigin = flip fall $ (500, 0)
-
-fall :: Grid -> Coord -> Grid
-fall grid coord =
-    if (snd coord) > gridMaxY grid then
+fall :: Int -> TileMap -> Coord -> TileMap
+fall gridMaxY grid coord =
+    if
+        (snd coord) > gridMaxY || (not $ isEmpty grid coord)
+    then
         grid
-    else case isEmpty grid (down coord) of
-        True -> fall (setGrid grid coord FlowingWater) (down coord)
-        False -> spread grid coord
+    else let
+        spaceBelow = (down coord)
+        grid2 = if isEmpty grid spaceBelow then fall gridMaxY grid spaceBelow else grid
+    in if isEmpty grid2 spaceBelow
+        then setGrid grid2 coord FlowingWater
+        -- Do flood or spill
+        else let
+            holes = findHoles grid2 coord
+            fillHole _grid holeCoord = fall gridMaxY _grid holeCoord
+            grid3 = foldl fillHole grid2 holes
+            shouldFill = not $ any (isEmpty grid3) holes
+        in if shouldFill then
+            fill grid3 coord
+        else
+            flow grid3 coord
 
-data ScanResult
-    = Wall
-    | DropAt Coord
 
+findHoles :: TileMap -> Coord -> [Coord]
+findHoles grid coord =
+    catMaybes [
+        scanDir grid left coord,
+        scanDir grid right coord
+    ]
 
-spread :: Grid -> Coord -> Grid
-spread grid coord =
-    let
-        scanL = scanDir grid left coord
-        scanR = scanDir grid right coord
-    in case (scanL, scanR) of
-        (Wall, Wall) -> fill grid coord
-        _ -> flow grid coord
-
-scanDir :: Grid -> (Coord -> Coord) -> Coord -> ScanResult
+scanDir :: TileMap -> (Coord -> Coord) -> Coord -> Maybe Coord
 scanDir grid dir coord =
     if isEmpty grid (down coord) then
-        DropAt coord
+        Just (down coord)
     else if isEmpty grid (dir coord) then
         scanDir grid dir (dir coord)
-    else Wall
+    else Nothing
 
-fill :: Grid -> Coord -> Grid
+fill :: TileMap -> Coord -> TileMap
 fill grid coord =
     fillDir right (fillDir left grid (left coord)) coord
 
-fillDir :: (Coord -> Coord) -> Grid -> Coord -> Grid
+fillDir :: (Coord -> Coord) -> TileMap -> Coord -> TileMap
 fillDir dir grid coord =
     if isEmpty grid coord then
         fillDir dir (setGrid grid coord SettledWater) (dir coord)
     else grid
 
-flow :: Grid -> Coord -> Grid
+flow :: TileMap -> Coord -> TileMap
 flow grid coord =
     flowDir left (flowDir right grid coord) coord
 
-flowDir :: (Coord -> Coord) -> Grid -> Coord -> Grid
+flowDir :: (Coord -> Coord) -> TileMap -> Coord -> TileMap
 flowDir dir grid coord =
-    let
+    if not $ isEmpty grid coord then
+        grid
+    else let
         newGrid = (setGrid grid coord FlowingWater)
     in if isEmpty grid (down coord) then
-        fall grid coord
-    else if isEmpty grid (dir coord) then
+        newGrid
+    else
         flowDir dir newGrid (dir coord)
-    else newGrid -- full
 
 
--- Grid
+-- TileMap
 
-gg :: Grid
-gg = Grid {
-    tileMap = Map.fromList [((495,2),Clay),((495,3),Clay),((495,4),Clay),((495,5),Clay),((495,6),Clay),((495,7),Clay),((496,7),Clay),((497,7),Clay),((498,2),Clay),((498,3),Clay),((498,4),Clay),((498,7),Clay),((498,10),Clay),((498,11),Clay),((498,12),Clay),((498,13),Clay),((499,7),Clay),((499,13),Clay),((500,7),Clay),((500,13),Clay),((501,3),Clay),((501,4),Clay),((501,5),Clay),((501,6),Clay),((501,7),Clay),((501,13),Clay),((502,13),Clay),((503,13),Clay),((504,10),Clay),((504,11),Clay),((504,12),Clay),((504,13),Clay),((506,1),Clay),((506,2),Clay)],
-    gridMaxY = 13
-}
+-- gg :: TileMap
+-- gg = Map.fromList [((495,2),Clay),((495,3),Clay),((495,4),Clay),((495,5),Clay),((495,6),Clay),((495,7),Clay),((496,7),Clay),((497,7),Clay),((498,2),Clay),((498,3),Clay),((498,4),Clay),((498,7),Clay),((498,10),Clay),((498,11),Clay),((498,12),Clay),((498,13),Clay),((499,7),Clay),((499,13),Clay),((500,7),Clay),((500,13),Clay),((501,3),Clay),((501,4),Clay),((501,5),Clay),((501,6),Clay),((501,7),Clay),((501,13),Clay),((502,13),Clay),((503,13),Clay),((504,10),Clay),((504,11),Clay),((504,12),Clay),((504,13),Clay),((506,1),Clay),((506,2),Clay)]
+
 
 data Tile
     = Clay
@@ -100,29 +100,25 @@ data Tile
     deriving (Show, Eq)
 
 type TileMap = Map.Map Coord Tile
-data Grid = Grid {
-  tileMap :: TileMap,
-  gridMaxY :: Int
-} deriving (Show, Eq)
 
-setGrid :: Grid -> Coord -> Tile -> Grid
-setGrid grid coord tile = grid { tileMap = Map.insert coord tile (tileMap grid) }
+setGrid :: TileMap -> Coord -> Tile -> TileMap
+setGrid grid coord tile = Map.insert coord tile grid
 
 buildGrid :: [Vein] -> TileMap
 buildGrid = Map.fromList . (>>= asTiles)
 
-showTile :: Grid -> Coord -> Char
+showTile :: TileMap -> Coord -> Char
 showTile grid coord =
-    case Map.lookup coord (tileMap grid) of
+    case Map.lookup coord grid of
         Just Clay -> '#'
         Just FlowingWater -> '|'
         Just SettledWater -> '~'
         Nothing -> '.'
 
-showGrid :: Grid -> String
+showGrid :: TileMap -> String
 showGrid grid =
     let
-        (minX, maxX, minY, maxY) = gridRange $ tileMap grid
+        (minX, maxX, minY, maxY) = gridRange $ grid
         showRow y = map (\x -> showTile grid (x, y)) [minX-1..maxX+1]
     in concat (map ((++"\n") . showRow) [minY-1..maxY+1])
 
