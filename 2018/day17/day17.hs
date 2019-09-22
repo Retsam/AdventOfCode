@@ -1,4 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
+import Debug.Trace
 import Data.Char (isNumber)
 import Text.ParserCombinators.ReadP (ReadP, readP_to_S, munch1, string, get, pfail, endBy, eof)
 import qualified Data.Map as Map
@@ -12,7 +13,10 @@ main = do
         result = fall maxY tiles (500, minY)
 
     putStrLn $ showGrid result
+    -- Part 1
     print $ length $ filter (/= Clay) $  map snd $ Map.toList $ result
+    -- Part 2
+    print $ length $ filter (== SettledWater) $  map snd $ Map.toList $ result
 
 -- Filling logic
 
@@ -23,75 +27,68 @@ isEmpty grid coord =
         Just FlowingWater -> True
         _ -> False
 
-fall :: Int -> TileMap -> Coord -> TileMap
+type MaxY = Int
+
+-- Recursive algorithm for falling water; when it hits something, flows
+fall :: MaxY -> TileMap -> Coord -> TileMap
 fall gridMaxY grid coord =
     if
-        (snd coord) > gridMaxY || (not $ isEmpty grid coord)
+        (snd coord) > gridMaxY ||
+        (not $ Map.lookup coord grid == Nothing)
     then
         grid
     else let
+        spaceBelow = down coord
+        newGrid = if isEmpty grid spaceBelow then fall gridMaxY grid spaceBelow else grid
+    in if isEmpty newGrid spaceBelow
+        then setGrid newGrid coord FlowingWater
+        else flow gridMaxY newGrid coord
+
+-- First flows in both directions, attempting to fill holes,
+-- until it hits a wall or fails to fill a hole.  Then fills.
+flow :: MaxY -> TileMap -> Coord -> TileMap
+flow gridMaxY grid coord =
+    let
+        (grid2, hitLeftWall) = flowDir gridMaxY grid left coord
+        (grid3, hitRightWall) = flowDir gridMaxY grid2 right coord
+        fillTile = if hitLeftWall && hitRightWall then SettledWater else FlowingWater
+    in fill fillTile grid3 coord
+
+flowDir :: MaxY -> TileMap -> (Coord -> Coord) -> Coord -> (TileMap, Bool)
+flowDir gridMaxY grid dir coord =
+    let
         spaceBelow = (down coord)
-        grid2 = if isEmpty grid spaceBelow then fall gridMaxY grid spaceBelow else grid
-    in if isEmpty grid2 spaceBelow
-        then setGrid grid2 coord FlowingWater
-        -- Do flood or spill
-        else let
-            holes = findHoles grid2 coord
-            fillHole _grid holeCoord = fall gridMaxY _grid holeCoord
-            grid3 = foldl fillHole grid2 holes
-            shouldFill = not $ any (isEmpty grid3) holes
-        in if shouldFill then
-            fill grid3 coord
-        else
-            flow grid3 coord
-
-
-findHoles :: TileMap -> Coord -> [Coord]
-findHoles grid coord =
-    catMaybes [
-        scanDir grid left coord,
-        scanDir grid right coord
-    ]
-
-scanDir :: TileMap -> (Coord -> Coord) -> Coord -> Maybe Coord
-scanDir grid dir coord =
-    if isEmpty grid (down coord) then
-        Just (down coord)
-    else if isEmpty grid (dir coord) then
-        scanDir grid dir (dir coord)
-    else Nothing
-
-fill :: TileMap -> Coord -> TileMap
-fill grid coord =
-    fillDir right (fillDir left grid (left coord)) coord
-
-fillDir :: (Coord -> Coord) -> TileMap -> Coord -> TileMap
-fillDir dir grid coord =
-    if isEmpty grid coord then
-        fillDir dir (setGrid grid coord SettledWater) (dir coord)
-    else grid
-
-flow :: TileMap -> Coord -> TileMap
-flow grid coord =
-    flowDir left (flowDir right grid coord) coord
-
-flowDir :: (Coord -> Coord) -> TileMap -> Coord -> TileMap
-flowDir dir grid coord =
-    if not $ isEmpty grid coord then
-        grid
-    else let
-        newGrid = (setGrid grid coord FlowingWater)
-    in if isEmpty grid (down coord) then
-        newGrid
+        nextSpace = (dir coord)
+        -- if the space below isn't empty, noops
+        gridAfterFall = fall gridMaxY grid spaceBelow
+        filledBelow = (not $ isEmpty gridAfterFall spaceBelow)
+        isBlocked = (not $ isEmpty gridAfterFall nextSpace)
+    in if filledBelow && (not isBlocked) then
+        flowDir gridMaxY gridAfterFall dir nextSpace
     else
-        flowDir dir newGrid (dir coord)
+        -- if it's filled below, but we're not flowing we must have hit a wall
+        (gridAfterFall, filledBelow)
 
+
+-- Fill with either flowing water (if bounded on both sides)
+-- otherwise fills with flowing water.
+fill :: Tile -> TileMap -> Coord -> TileMap
+fill tile grid coord =
+    fillDir tile right (fillDir tile left grid coord) coord
+
+fillDir :: Tile -> (Coord -> Coord) -> TileMap -> Coord -> TileMap
+fillDir fillTile dir grid coord =
+    let
+        spaceBelow = down coord
+        nextSpace = dir coord
+        filledBelow = (not $ isEmpty grid spaceBelow)
+        isBlocked = (not $ isEmpty grid nextSpace)
+        filledGrid = setGrid grid coord fillTile
+    in if filledBelow && (not isBlocked) then
+        fillDir fillTile dir filledGrid (dir coord)
+    else filledGrid
 
 -- TileMap
-
--- gg :: TileMap
--- gg = Map.fromList [((495,2),Clay),((495,3),Clay),((495,4),Clay),((495,5),Clay),((495,6),Clay),((495,7),Clay),((496,7),Clay),((497,7),Clay),((498,2),Clay),((498,3),Clay),((498,4),Clay),((498,7),Clay),((498,10),Clay),((498,11),Clay),((498,12),Clay),((498,13),Clay),((499,7),Clay),((499,13),Clay),((500,7),Clay),((500,13),Clay),((501,3),Clay),((501,4),Clay),((501,5),Clay),((501,6),Clay),((501,7),Clay),((501,13),Clay),((502,13),Clay),((503,13),Clay),((504,10),Clay),((504,11),Clay),((504,12),Clay),((504,13),Clay),((506,1),Clay),((506,2),Clay)]
-
 
 data Tile
     = Clay
