@@ -1,4 +1,5 @@
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromJust)
+import Data.List (elemIndex)
 
 type Tile = Char
 type State = [[Tile]]
@@ -8,9 +9,31 @@ open = '.'
 yard = '#'
 
 -- Part 1
+-- main = interact (
+--     lines |> iterate step |> (!! 10) |> score |> show |> (++"\n")
+--     )
+-- Part 2
 main = interact (
-    lines |> iterate step |> (!! 10) |> score |> show |> (++"\n")
+    lines |> iterate step
+    |> findCycle |> fromJust
+    |> nthFromCycle 1000000000
+    |> score |> show |> (++"\n")
     )
+
+nthFromCycle :: Int -> (Int, [a]) -> a
+nthFromCycle n (prefix, cycle) =
+    cycle !! ((n - prefix) `mod` (length cycle))
+
+
+findCycle :: Eq a => [a] -> Maybe (Int, [a])
+findCycle (x:xs) = _findCycle xs [x]
+findCycle _ = Nothing
+
+_findCycle :: Eq a => [a] -> [a] -> Maybe (Int, [a])
+_findCycle (x:xs) prev = case elemIndex x prev of
+    Just i  -> Just (length prev - i - 1, reverse $ take (i + 1) prev)
+    Nothing -> _findCycle xs (x:prev)
+_findCycle _ _ = Nothing
 
 
 score :: State -> Int
