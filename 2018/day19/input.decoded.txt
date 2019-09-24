@@ -1,0 +1,36 @@
+// Jump line 18: // (0 + 16 + 1)
+// r4 = 1 // Jump from 27
+// r5 = 1 // Come from line 16
+// r1 = r4 * r5 // Come from line 12
+// r1 = r1 == r2
+// r3 += r1 // skip next line if r1 == r2
+// r3 += 1 // skip next line
+// r0 += r4 // only if r1 != r2
+// r5 += 1
+// r1 = r5 > r2
+// r3 += r1 // skip next line if r5 > r2
+// r3 = 2 // Goto line 4
+// r4 += 1
+// r1 = r4 > r2
+// r3 += r1 // skip next line if r4 > r2
+// r3 = 1 // goto line 3
+// r3 = 16 * 16 (256) // exit
+// r2 += 2  // jump from 1
+// r2 *= 2
+// r2 *= 19 // (r3 * r2)
+// r2 *= 11
+// r1 += 3
+// r1 *= 22 (r1 * r3)
+// r1 += 17
+// r2 += r1
+// jmp rel r0: // if part 2, skip next line
+// Jump line 1
+// r1 = 27 // r3
+// r1 *= 28 // r3
+// r1 += 29 // r3
+// r1 *= 30 // r3
+// r1 *= 14
+// r1 *= 32 // r3
+// r2 += r1
+// r0 = 0 // reset to problem 1
+// Jump line 1

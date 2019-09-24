@@ -3,8 +3,23 @@ import qualified Text.ParserCombinators.ReadP as P
 import Text.ParserCombinators.ReadP (ReadP)
 import Data.Maybe (fromJust)
 import Data.List (find)
+import Debug.Trace
 
-main = interact (show . runUntilHalt . parseInput)
+-- Part 1
+-- main = interact (show . runUntilHalt . parseInput)
+-- Part 2
+-- The input represents an algorithm that sums
+--   all the factors of a number.
+--   Part 1 input is 919
+--   Part 2 input is 10551319, which is  23 * 79 * 5807
+main = print $ (
+    1
+    + (23 + 79 + 5807)
+    + (23 * 79)
+    +      (79 * 5807)
+    + (23      * 5807)
+    + (23 * 79 * 5807)
+    )
 
 type Iptr = Int
 type Instruction = (Opcode, Int, Int, Int)
@@ -13,9 +28,9 @@ type Program = (Iptr, [Instruction])
 data Runstate = Running | Halted deriving (Show, Eq)
 type State = (Registers, Runstate)
 -- Part 1
--- initRegisters = Registers { r0 = 0, r1 = 0, r2 = 0, r3 = 0, r4 = 0, r5 = 0}
+initRegisters = Registers { r0 = 0, r1 = 0, r2 = 0, r3 = 0, r4 = 0, r5 = 0}
 -- Part 2
-initRegisters = Registers { r0 = 1, r1 = 0, r2 = 0, r3 = 0, r4 = 0, r5 = 0}
+-- initRegisters = Registers { r0 = 1, r1 = 0, r2 = 0, r3 = 0, r4 = 0, r5 = 0}
 initState = (initRegisters, Running)
 
 runUntilHalt :: Program -> State
@@ -65,15 +80,18 @@ get regs 4 = r4 regs
 get regs 5 = r5 regs
 
 set :: Registers -> Int -> Int -> Registers
-set regs 0 x = regs { r0 = x }
-set regs 1 x = regs { r1 = x }
-set regs 2 x = regs { r2 = x }
-set regs 3 x = regs { r3 = x }
-set regs 4 x = regs { r4 = x }
-set regs 5 x = regs { r5 = x }
+set = _set
+-- set regs r v = trace ("Setting r" ++ (show r) ++ " to " ++ (show v)) $ _set regs r v
+
+_set regs 0 x = regs { r0 = x }
+_set regs 1 x = regs { r1 = x }
+_set regs 2 x = regs { r2 = x }
+_set regs 3 x = regs { r3 = x }
+_set regs 4 x = regs { r4 = x }
+_set regs 5 x = regs { r5 = x }
 
 incr :: Registers -> Int -> Registers
-incr regs i = set regs i . (+1) . get regs $ i
+incr regs i = _set regs i . (+1) . get regs $ i
 
 
 -- Operator implementation
