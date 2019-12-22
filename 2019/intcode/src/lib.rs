@@ -93,11 +93,14 @@ pub fn read_instruction(state: &mut ProgramState) -> Instruction {
     let mut chars = ins_str.chars().rev();
     let (b, a) = (chars.next().unwrap_or('0'), chars.next().unwrap_or('0'));
     let opcode = vec!(a,b).into_iter().collect::<String>().parse::<Value>().expect("!!");
+    let mut get_param = || {
+        parse_param(state, chars.next())
+    };
     match opcode {
-        1 => Add(parse_param(state, chars.next()), parse_param(state, chars.next()), parse_param(state, chars.next())),
-        2 => Mul(parse_param(state, chars.next()), parse_param(state, chars.next()), parse_param(state, chars.next())),
-        3 => Input(parse_param(state, chars.next())),
-        4 => Out(parse_param(state, chars.next())),
+        1 => Add(get_param(), get_param(), get_param()),
+        2 => Mul(get_param(), get_param(), get_param()),
+        3 => Input(get_param()),
+        4 => Out(get_param()),
         99 => Halt,
         x => panic!("Unknown opcode {}", x),
     }
