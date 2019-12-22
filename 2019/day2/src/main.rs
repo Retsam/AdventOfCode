@@ -1,12 +1,12 @@
 extern crate intcode;
 use std::io::{self, Read};
+use intcode::{Value};
 
 const PART_2: bool = true;
 
-fn run(mut prog: intcode::Program) -> usize {
-    let mut prog_state = intcode::ProgramState {ptr: 0, prog: &mut prog};
-    intcode::run(&mut prog_state);
-    prog_state.prog[0]
+fn run(mut prog: intcode::Program) -> Value {
+    intcode::run_prog(&mut prog);
+    prog[0]
 }
 
 fn main() -> io::Result<()> {
@@ -15,8 +15,8 @@ fn main() -> io::Result<()> {
     let line = buffer.lines().next().expect("expected a single line");
 
     let mut prog = line.split(",")
-        .map(|s| s.parse::<usize>().expect("Not a number"))
-        .collect::<Vec<usize>>();
+        .map(|s| s.parse::<Value>().expect("Not a number"))
+        .collect::<Vec<Value>>();
 
     if !PART_2 {
         prog[1] = 12;
