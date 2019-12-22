@@ -24,6 +24,10 @@ pub enum Instruction {
     Mul(Parameter, Parameter, Parameter),
     Input(Parameter),
     Out(Parameter),
+    JmpTrue(Parameter, Parameter),
+    JmpFalse(Parameter, Parameter),
+    Lt(Parameter, Parameter, Parameter),
+    Eq(Parameter, Parameter, Parameter),
     Halt
 }
 use Instruction::{*};
@@ -101,6 +105,10 @@ pub fn read_instruction(state: &mut ProgramState) -> Instruction {
         2 => Mul(get_param(), get_param(), get_param()),
         3 => Input(get_param()),
         4 => Out(get_param()),
+        5 => JmpTrue(get_param(), get_param()),
+        6 => JmpFalse(get_param(), get_param()),
+        7 => Lt(get_param(), get_param(), get_param()),
+        8 => Eq(get_param(), get_param(), get_param()),
         99 => Halt,
         x => panic!("Unknown opcode {}", x),
     }
@@ -118,6 +126,20 @@ pub fn exec_instruction(state: &mut ProgramState, ins: Instruction) -> RunState 
             state.output.push(get_val(state, a));
             RunState::Running
         },
+        JmpTrue(a, ptr) => {
+            if get_val(state, a) != 0 {
+                state.ptr = get_val(state, ptr).try_into().unwrap();
+            }
+            RunState::Running
+        },
+        JmpFalse(a, ptr) => {
+            if get_val(state, a) == 0 {
+                state.ptr = get_val(state, ptr).try_into().unwrap();
+            }
+            RunState::Running
+        },
+        Lt(a, b, dest) => set_reg(state, dest, if get_val(state, a) < get_val(state , b) { 1 } else { 0 }),
+        Eq(a, b, dest) => set_reg(state, dest, if get_val(state, a) == get_val(state , b) { 1 } else { 0 }),
         Halt => RunState::Halted,
     }
 }
@@ -139,5 +161,20 @@ mod tests {
     #[test]
     fn negative_numbers() {
         run_prog(&mut vec!(1101,100,-1,4,0));
+    }
+
+    #[test]
+    fn test_eq() {
+        // Tests if input equals 8
+        let prog = vec!(3,9,8,9,10,9,4,9,99,-1,8);
+        assert_eq!(run_prog_with_input(&mut prog.clone(), vec!(8)), [1]);
+        assert_eq!(run_prog_with_input(&mut prog.clone(), vec!(7)), [0]);
+    }
+    #[test]
+    fn test_lt() {
+        // Tests if input is less than 8
+        let prog = vec!(3,9,7,9,10,9,4,9,99,-1,8);
+        assert_eq!(run_prog_with_input(&mut prog.clone(), vec!(8)), [0]);
+        assert_eq!(run_prog_with_input(&mut prog.clone(), vec!(7)), [1]);
     }
 }
