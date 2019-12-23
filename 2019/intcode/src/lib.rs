@@ -37,6 +37,12 @@ pub enum RunState {
     Halted
 }
 
+pub fn parse_program(input: &str) -> Program {
+    input.split(",")
+        .map(|s| s.parse::<Value>().expect("Not a number"))
+        .collect::<Vec<Value>>()
+}
+
 fn parse_val(state: &mut ProgramState) -> Value {
     let val = state.prog[state.ptr];
     state.ptr += 1;

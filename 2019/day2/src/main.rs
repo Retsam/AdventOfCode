@@ -12,11 +12,10 @@ fn run(mut prog: intcode::Program) -> Value {
 fn main() -> io::Result<()> {
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
-    let line = buffer.lines().next().expect("expected a single line");
 
-    let mut prog = line.split(",")
-        .map(|s| s.parse::<Value>().expect("Not a number"))
-        .collect::<Vec<Value>>();
+    let mut prog = intcode::parse_program(
+        buffer.lines().next().expect("expected a single line")
+    );
 
     if !PART_2 {
         prog[1] = 12;
