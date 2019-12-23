@@ -86,7 +86,6 @@ pub fn run_prog_with_input(mut prog: &mut Program, input: Vec<Value>) -> Output 
     state.output.to_owned()
 }
 pub fn run(state: &mut ProgramState) {
-    state.input.reverse();
     loop {
         if step(state) == RunState::Halted { break; }
     }
@@ -125,7 +124,7 @@ pub fn exec_instruction(state: &mut ProgramState, ins: Instruction) -> RunState 
         Add(a, b, dest) => set_reg(state, dest, get_val(state, a) + get_val(state, b)),
         Mul(a, b, dest) => set_reg(state, dest, get_val(state, a) * get_val(state, b)),
         Input(dest) => {
-            let input = state.input.pop().expect("No input");
+            let input = state.input.remove(0);
             set_reg(state, dest, input)
         },
         Out(a) => {
