@@ -34,7 +34,8 @@ use Instruction::{*};
 #[derive(PartialEq)]
 pub enum RunState {
     Running,
-    Halted
+    Output(Value),
+    Halted,
 }
 
 pub fn parse_program(input: &str) -> Program {
@@ -90,6 +91,15 @@ pub fn run(state: &mut ProgramState) {
         if step(state) == RunState::Halted { break; }
     }
 }
+pub fn run_until_output(state: &mut ProgramState) -> Option<Value> {
+    loop {
+        match step(state) {
+            RunState::Halted => break None,
+            RunState::Output(v) => break Some(v),
+            RunState::Running => continue,
+        }
+    }
+}
 
 pub fn step(state: &mut ProgramState) -> RunState {
     let ins = read_instruction(state);
@@ -128,8 +138,9 @@ pub fn exec_instruction(state: &mut ProgramState, ins: Instruction) -> RunState 
             set_reg(state, dest, input)
         },
         Out(a) => {
-            state.output.push(get_val(state, a));
-            RunState::Running
+            let out_val = get_val(state, a);
+            state.output.push(out_val);
+            RunState::Output(out_val)
         },
         JmpTrue(a, ptr) => {
             if get_val(state, a) != 0 {
@@ -181,5 +192,19 @@ mod tests {
         let prog = vec!(3,9,7,9,10,9,4,9,99,-1,8);
         assert_eq!(run_prog_with_input(&mut prog.clone(), vec!(8)), [0]);
         assert_eq!(run_prog_with_input(&mut prog.clone(), vec!(7)), [1]);
+    }
+    #[test]
+    fn test_run_until_output() {
+        let mut prog = vec!(104, 104, 104, 99, 99);
+        let mut state = ProgramState {
+            prog: &mut prog,
+            input: Vec::new(),
+            output: Vec::new(),
+            ptr: 0,
+        };
+        assert_eq!(run_until_output(&mut state), Some(104));
+        assert_eq!(run_until_output(&mut state), Some(99));
+        assert_eq!(run_until_output(&mut state), None);
+
     }
 }
