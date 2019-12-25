@@ -1,210 +1,173 @@
 use std::convert::TryInto;
+mod instruction;
 
-pub type Program = Vec<i32>;
-pub type Output = Vec<i32>;
-pub struct ProgramState<'a> {
-    pub ptr: usize,
-    pub prog: &'a mut Program,
-    pub input: Vec<i32>,
-    pub output: Output,
+pub type Value = i32;
+type Register = usize;
+
+type Program = Vec<i32>;
+
+pub struct IntcodeProgram {
+    ptr: usize,
+    prog: Program,
+    input: Vec<Value>,
+    pub state: RunState,
+}
+pub struct ProgramResults {
+    pub prog: Program,
+    pub output: Vec<Value>,
 }
 
-type Register = usize;
-pub type Value = i32;
-
 #[derive(Debug)]
-pub enum Parameter {
+enum Parameter {
     Position(Register),
     Immediate(Value)
 }
 
-#[derive(Debug)]
-pub enum Instruction {
-    Add(Parameter, Parameter, Parameter),
-    Mul(Parameter, Parameter, Parameter),
-    Input(Parameter),
-    Out(Parameter),
-    JmpTrue(Parameter, Parameter),
-    JmpFalse(Parameter, Parameter),
-    Lt(Parameter, Parameter, Parameter),
-    Eq(Parameter, Parameter, Parameter),
-    Halt
-}
-use Instruction::{*};
 #[derive(PartialEq)]
 pub enum RunState {
     Running,
-    Output(Value),
     Halted,
 }
+use RunState::{*};
 
-pub fn parse_program(input: &str) -> Program {
-    input.split(",")
-        .map(|s| s.parse::<Value>().expect("Not a number"))
-        .collect::<Vec<Value>>()
-}
-
-fn parse_val(state: &mut ProgramState) -> Value {
-    let val = state.prog[state.ptr];
-    state.ptr += 1;
-    val
-}
-fn parse_param(state: &mut ProgramState, mode: Option<char>) -> Parameter {
-    let val = parse_val(state);
-    match mode {
-        Some('1') => Parameter::Immediate(val),
-        Some('0') => Parameter::Position(val.try_into().unwrap()),
-        None => Parameter::Position(val.try_into().unwrap()),
-        Some(x) => panic!("Invalid mode {}", x),
+impl IntcodeProgram {
+    /** Creation */
+    pub fn from_str(input: &str) -> IntcodeProgram {
+        IntcodeProgram::from_vec(input.split(",")
+            .map(|s| s.parse::<Value>().expect("Not a number"))
+            .collect::<Vec<Value>>())
     }
-}
-fn get_val(state: &ProgramState, p: Parameter) -> Value {
-    match p {
-        Parameter::Immediate(v) => v,
-        Parameter::Position(r) => state.prog[r]
-    }
-}
-fn set_reg(state: &mut ProgramState, r: Parameter, v: Value) -> RunState {
-    match r {
-        Parameter::Position(r) => state.prog[r] = v,
-        _ => panic!("Not a register when expected"),
-    };
-    // For convenience of implementing instruction execution
-    RunState::Running
-}
-
-pub fn run_prog(prog: &mut Program) -> Output {
-    run_prog_with_input(prog, Vec::new())
-}
-pub fn run_prog_with_input(mut prog: &mut Program, input: Vec<Value>) -> Output {
-    let state = &mut ProgramState {
-        ptr: 0,
-        prog: &mut prog,
-        output: Vec::new(),
-        input,
-    };
-    run(state);
-    state.output.to_owned()
-}
-pub fn run(state: &mut ProgramState) {
-    loop {
-        if step(state) == RunState::Halted { break; }
-    }
-}
-pub fn run_until_output(state: &mut ProgramState) -> Option<Value> {
-    loop {
-        match step(state) {
-            RunState::Halted => break None,
-            RunState::Output(v) => break Some(v),
-            RunState::Running => continue,
+    pub fn from_vec(prog: Program) -> IntcodeProgram {
+        IntcodeProgram {
+            ptr: 0,
+            state: Running,
+            prog,
+            input: vec!(),
         }
     }
-}
 
-pub fn step(state: &mut ProgramState) -> RunState {
-    let ins = read_instruction(state);
-    exec_instruction(state, ins)
-}
+    pub fn with_input(mut self, input: &[Value]) -> Self {
+        self.input.extend_from_slice(input);
+        self
+    }
 
-pub fn read_instruction(state: &mut ProgramState) -> Instruction {
-    let instruction = parse_val(state);
-    let ins_str = instruction.to_string();
-    let mut chars = ins_str.chars().rev();
-    let (b, a) = (chars.next().unwrap_or('0'), chars.next().unwrap_or('0'));
-    let opcode = vec!(a,b).into_iter().collect::<String>().parse::<Value>().expect("!!");
-    let mut get_param = || {
-        parse_param(state, chars.next())
-    };
-    match opcode {
-        1 => Add(get_param(), get_param(), get_param()),
-        2 => Mul(get_param(), get_param(), get_param()),
-        3 => Input(get_param()),
-        4 => Out(get_param()),
-        5 => JmpTrue(get_param(), get_param()),
-        6 => JmpFalse(get_param(), get_param()),
-        7 => Lt(get_param(), get_param(), get_param()),
-        8 => Eq(get_param(), get_param(), get_param()),
-        99 => Halt,
-        x => panic!("Unknown opcode {}", x),
+    /** Running */
+    pub fn run_until_halt(mut self) -> ProgramResults {
+        let mut output = vec!();
+        if self.state == Halted {
+            ProgramResults { output, prog: self.prog }
+        } else { loop {
+            match self.run_until_output() {
+                None => break ProgramResults { output, prog: self.prog },
+                Some(out) => output.push(out),
+            }
+        }}
+    }
+
+    pub fn run_until_output(&mut self) -> Option<Value> {
+        loop {
+            let step_result = self.step();
+            if step_result.is_some() || self.state == Halted {
+                break step_result;
+            }
+        }
+    }
+
+    /** Shortcut for run_until_halt().output */
+    pub fn run(self) -> Vec<Value> {
+        self.run_until_halt().output
+    }
+
+    pub fn step(&mut self) -> Option<Value> {
+        instruction::Instruction::read(self).exec(self)
+    }
+
+    /** Implementation */
+    fn read_ptr(&mut self) -> Value {
+        let val = self.prog[self.ptr];
+        self.ptr += 1;
+        val
+    }
+    fn parse_param(&mut self, mode: Option<char>) -> Parameter {
+        let val = self.read_ptr();
+        match mode {
+            Some('1') => Parameter::Immediate(val),
+            Some('0') => Parameter::Position(val.try_into().unwrap()),
+            None => Parameter::Position(val.try_into().unwrap()),
+            Some(x) => panic!("Invalid mode {}", x),
+        }
+    }
+    fn get_val(&self, p: Parameter) -> Value {
+        match p {
+            Parameter::Immediate(v) => v,
+            Parameter::Position(r) => self.prog[r]
+        }
+    }
+    fn set_reg(&mut self, r: Parameter, v: Value) {
+        match r {
+            Parameter::Position(r) => self.prog[r] = v,
+            _ => panic!("Not a register when expected"),
+        };
     }
 }
 
-pub fn exec_instruction(state: &mut ProgramState, ins: Instruction) -> RunState {
-    match ins {
-        Add(a, b, dest) => set_reg(state, dest, get_val(state, a) + get_val(state, b)),
-        Mul(a, b, dest) => set_reg(state, dest, get_val(state, a) * get_val(state, b)),
-        Input(dest) => {
-            let input = state.input.remove(0);
-            set_reg(state, dest, input)
-        },
-        Out(a) => {
-            let out_val = get_val(state, a);
-            state.output.push(out_val);
-            RunState::Output(out_val)
-        },
-        JmpTrue(a, ptr) => {
-            if get_val(state, a) != 0 {
-                state.ptr = get_val(state, ptr).try_into().unwrap();
-            }
-            RunState::Running
-        },
-        JmpFalse(a, ptr) => {
-            if get_val(state, a) == 0 {
-                state.ptr = get_val(state, ptr).try_into().unwrap();
-            }
-            RunState::Running
-        },
-        Lt(a, b, dest) => set_reg(state, dest, if get_val(state, a) < get_val(state , b) { 1 } else { 0 }),
-        Eq(a, b, dest) => set_reg(state, dest, if get_val(state, a) == get_val(state , b) { 1 } else { 0 }),
-        Halt => RunState::Halted,
-    }
-}
+
 
 #[cfg(test)]
 mod tests {
-    use super::{*};
+    use super::{ IntcodeProgram as IC };
     #[test]
     fn input_output() {
-        let output = run_prog_with_input(&mut vec!(3,0,4,0,3,0,4,0,99), vec!(42, 43));
-        assert_eq!(output, vec!(42, 43))
+        let prog = "3,0,4,0,3,0,4,0,99";
+        assert_eq!(
+            IC::from_str(prog).with_input(&[42, 43]).run(),
+            [42, 43]
+        );
     }
 
     #[test]
     fn param_modes() {
-        run_prog(&mut vec!(1002,4,3,4,33));
+        IC::from_vec(vec!(1002,4,3,4,33)).run();
     }
 
     #[test]
     fn negative_numbers() {
-        run_prog(&mut vec!(1101,100,-1,4,0));
+        IC::from_vec(vec!(1101,100,-1,4,0)).run();
     }
 
     #[test]
     fn test_eq() {
         // Tests if input equals 8
-        let prog = vec!(3,9,8,9,10,9,4,9,99,-1,8);
-        assert_eq!(run_prog_with_input(&mut prog.clone(), vec!(8)), [1]);
-        assert_eq!(run_prog_with_input(&mut prog.clone(), vec!(7)), [0]);
+        let prog = "3,9,8,9,10,9,4,9,99,-1,8";
+        assert_eq!(
+            IC::from_str(prog).with_input(&[8]).run(),
+            [1]
+        );
+        assert_eq!(
+            IC::from_str(prog).with_input(&[7]).run(),
+            [0]
+        );
     }
+
     #[test]
     fn test_lt() {
         // Tests if input is less than 8
-        let prog = vec!(3,9,7,9,10,9,4,9,99,-1,8);
-        assert_eq!(run_prog_with_input(&mut prog.clone(), vec!(8)), [0]);
-        assert_eq!(run_prog_with_input(&mut prog.clone(), vec!(7)), [1]);
+        let prog = "3,9,7,9,10,9,4,9,99,-1,8";
+        assert_eq!(
+            IC::from_str(prog).with_input(&[8]).run(),
+            [0]
+        );
+        assert_eq!(
+            IC::from_str(prog).with_input(&[7]).run(),
+            [1]
+        );
     }
+
     #[test]
     fn test_run_until_output() {
-        let mut prog = vec!(104, 104, 104, 99, 99);
-        let mut state = ProgramState {
-            prog: &mut prog,
-            input: Vec::new(),
-            output: Vec::new(),
-            ptr: 0,
-        };
-        assert_eq!(run_until_output(&mut state), Some(104));
-        assert_eq!(run_until_output(&mut state), Some(99));
-        assert_eq!(run_until_output(&mut state), None);
-
+        let mut prog = IC::from_vec(vec!(104, 104, 104, 99, 99));
+        assert_eq!(prog.run_until_output(), Some(104));
+        assert_eq!(prog.run_until_output(), Some(99));
+        assert_eq!(prog.run_until_output(), None);
     }
 }

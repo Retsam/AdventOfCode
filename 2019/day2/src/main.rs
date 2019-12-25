@@ -1,21 +1,23 @@
 extern crate intcode;
 use std::io::{self, Read};
-use intcode::{Value};
+use intcode::{Value, IntcodeProgram};
 
 const PART_2: bool = true;
 
-fn run(mut prog: intcode::Program) -> Value {
-    intcode::run_prog(&mut prog);
-    prog[0]
+fn run(prog: Vec<Value>) -> Value {
+    IntcodeProgram::from_vec(prog)
+        .run_until_halt()
+        .prog[0]
 }
 
 fn main() -> io::Result<()> {
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
 
-    let mut prog = intcode::parse_program(
-        buffer.lines().next().expect("expected a single line")
-    );
+    let prog_str = buffer.lines().next().expect("expected a single line");
+    let mut prog = prog_str.split(",")
+            .map(|s| s.parse::<Value>().expect("Not a number"))
+            .collect::<Vec<Value>>();
 
     if !PART_2 {
         prog[1] = 12;

@@ -1,4 +1,5 @@
 use std::io::{self, Read};
+use intcode::{ IntcodeProgram };
 
 type AmpOrder = [i32; 5];
 
@@ -22,11 +23,12 @@ fn permutations() -> Vec<AmpOrder> {
     results
 }
 
-fn test_order(order: AmpOrder, mut prog: intcode::Program) -> intcode::Value {
+fn test_order(order: AmpOrder, prog: &str) -> intcode::Value {
     let mut input_val: i32 = 0;
     for phase_setting in &order {
-        let input = vec!(*phase_setting, input_val);
-        let output = intcode::run_prog_with_input(&mut prog, input);
+        let output = IntcodeProgram::from_str(prog)
+            .with_input(&[*phase_setting, input_val])
+            .run();
         input_val = output[0];
     }
     input_val
@@ -36,13 +38,11 @@ fn main() -> io::Result<()> {
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
 
-    let prog = intcode::parse_program(
-        buffer.lines().next().expect("expected a single line")
-    );
+    let prog = buffer.lines().next().expect("expected a single line");
 
     let perms = permutations();
     let max = perms.into_iter().map(|perm| {
-        test_order(perm, prog.clone())
+        test_order(perm, prog)
     }).max();
     println!("Max thruster signal is {:?}", max.unwrap());
     Ok(())
