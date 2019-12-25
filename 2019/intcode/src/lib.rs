@@ -46,9 +46,14 @@ impl IntcodeProgram {
         }
     }
 
+    // For use in "fluent" style builder pattern
     pub fn with_input(mut self, input: &[Value]) -> Self {
-        self.input.extend_from_slice(input);
+        self.add_input(input);
         self
+    }
+    // For other purposes
+    pub fn add_input(&mut self, input: &[Value]) {
+        self.input.extend_from_slice(input)
     }
 
     /** Running */
