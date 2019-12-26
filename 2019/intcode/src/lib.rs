@@ -11,6 +11,8 @@ pub struct IntcodeProgram {
     prog: Program,
     input: Vec<Value>,
     pub state: RunState,
+    // Offset applied to memory addresses in relative mode
+    relative_base: Value,
 }
 pub struct ProgramResults {
     pub prog: Program,
@@ -20,7 +22,8 @@ pub struct ProgramResults {
 #[derive(Debug)]
 enum Parameter {
     Position(Register),
-    Immediate(Value)
+    Immediate(Value),
+    Relative(Value),
 }
 
 #[derive(PartialEq)]
@@ -43,6 +46,7 @@ impl IntcodeProgram {
             state: Running,
             prog,
             input: vec!(),
+            relative_base: 0,
         }
     }
 
@@ -88,16 +92,27 @@ impl IntcodeProgram {
     }
 
     /** Implementation */
+    fn read(&self, idx: usize) -> Value {
+        if idx > self.prog.len() { return 0 };
+        self.prog[idx]
+    }
+    fn write(&mut self, idx: usize, val: Value) {
+        if idx >= self.prog.len() {
+            self.prog.resize(idx + 1, 0);
+        }
+        self.prog[idx] = val
+    }
     fn read_ptr(&mut self) -> Value {
-        let val = self.prog[self.ptr];
+        let val = self.read(self.ptr);
         self.ptr += 1;
         val
     }
     fn parse_param(&mut self, mode: Option<char>) -> Parameter {
         let val = self.read_ptr();
         match mode {
-            Some('1') => Parameter::Immediate(val),
             Some('0') => Parameter::Position(val.try_into().unwrap()),
+            Some('1') => Parameter::Immediate(val),
+            Some('2') => Parameter::Relative(val),
             None => Parameter::Position(val.try_into().unwrap()),
             Some(x) => panic!("Invalid mode {}", x),
         }
@@ -105,18 +120,22 @@ impl IntcodeProgram {
     fn get_val(&self, p: Parameter) -> Value {
         match p {
             Parameter::Immediate(v) => v,
-            Parameter::Position(r) => self.prog[r]
+            Parameter::Position(r) => self.read(r),
+            Parameter::Relative(v) => self.read(as_index(self.relative_base + v)),
         }
     }
     fn set_reg(&mut self, r: Parameter, v: Value) {
         match r {
-            Parameter::Position(r) => self.prog[r] = v,
+            Parameter::Position(r) => self.write(r, v),
+            Parameter::Relative(r) => self.write(as_index(r + self.relative_base),  v),
             _ => panic!("Not a register when expected"),
         };
     }
 }
 
-
+fn as_index(offset: i32) -> usize {
+    offset.try_into().expect("Invalid index")
+}
 
 #[cfg(test)]
 mod tests {
@@ -174,5 +193,13 @@ mod tests {
         assert_eq!(prog.run_until_output(), Some(104));
         assert_eq!(prog.run_until_output(), Some(99));
         assert_eq!(prog.run_until_output(), None);
+    }
+
+    // Tests relative mode, and out-of-bounds reading and writing
+    #[test]
+    fn quine_test() {
+        let prog = vec!(109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99);
+        let out = IC::from_vec(prog.clone()).run();
+        assert_eq!(prog, out);
     }
 }

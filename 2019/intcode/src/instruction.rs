@@ -11,6 +11,7 @@ pub(super) enum Instruction {
     JmpFalse(Parameter, Parameter),
     Lt(Parameter, Parameter, Parameter),
     Eq(Parameter, Parameter, Parameter),
+    RelBaseOffset(Parameter),
     Halt
 }
 use Instruction::{*};
@@ -34,6 +35,7 @@ impl Instruction {
             6 => JmpFalse(get_param(), get_param()),
             7 => Lt(get_param(), get_param(), get_param()),
             8 => Eq(get_param(), get_param(), get_param()),
+            9 => RelBaseOffset(get_param()),
             99 => Halt,
             x => panic!("Unknown opcode {}", x),
         }
@@ -61,7 +63,8 @@ impl Instruction {
             },
             Lt(a, b, dest) => state.set_reg(dest, if state.get_val(a) < state.get_val(b) { 1 } else { 0 }),
             Eq(a, b, dest) => state.set_reg(dest, if state.get_val(a) == state.get_val(b) { 1 } else { 0 }),
-            Halt => { state.state = Halted }
+            Halt => { state.state = Halted },
+            RelBaseOffset(a) => { state.relative_base += state.get_val(a); },
         };
         output
     }
