@@ -2,7 +2,7 @@ use std::io::{self, Read};
 use intcode::{ IntcodeProgram };
 
 const PART_2: bool = true;
-type AmpOrder = [i32; 5];
+type AmpOrder = [intcode::Value; 5];
 
 fn permutations() -> Vec<AmpOrder> {
     let mut results = Vec::new();
@@ -25,7 +25,7 @@ fn permutations() -> Vec<AmpOrder> {
 }
 
 fn test_order(order: AmpOrder, prog: &str) -> intcode::Value {
-    let mut input_val: i32 = 0;
+    let mut input_val: intcode::Value = 0;
     for phase_setting in &order {
         let output = IntcodeProgram::from_str(prog)
             .with_input(&[*phase_setting, input_val])

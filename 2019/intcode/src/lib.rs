@@ -1,10 +1,10 @@
 use std::convert::TryInto;
 mod instruction;
 
-pub type Value = i32;
+pub type Value = i64;
 type Register = usize;
 
-type Program = Vec<i32>;
+type Program = Vec<Value>;
 
 pub struct IntcodeProgram {
     ptr: usize,
@@ -133,7 +133,7 @@ impl IntcodeProgram {
     }
 }
 
-fn as_index(offset: i32) -> usize {
+fn as_index(offset: i64) -> usize {
     offset.try_into().expect("Invalid index")
 }
 
@@ -201,5 +201,11 @@ mod tests {
         let prog = vec!(109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99);
         let out = IC::from_vec(prog.clone()).run();
         assert_eq!(prog, out);
+    }
+
+    #[test]
+    fn test_large_nums() {
+        let prog = vec!(1102,34915192,34915192,7,4,7,99,0);
+        assert_eq!(IC::from_vec(prog).run(), [1219070632396864]);
     }
 }
