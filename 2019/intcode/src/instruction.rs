@@ -1,5 +1,6 @@
 use std::convert::TryInto;
-use super::{Value, IntcodeProgram, Parameter, ProgState::{*}};
+use super::{Value, IntcodeProgram, ProgState::{*}};
+use super::parameter::{Parameter};
 
 #[derive(Debug)]
 pub(super) enum Instruction {
@@ -24,7 +25,7 @@ impl Instruction {
         let (b, a) = (chars.next().unwrap_or('0'), chars.next().unwrap_or('0'));
         let opcode = vec!(a,b).into_iter().collect::<String>().parse::<Value>().expect("!!");
         let mut get_param = || {
-            state.parse_param(chars.next())
+            Parameter::new(state.read_ptr(), chars.next())
         };
         match opcode {
             1 => Add(get_param(), get_param(), get_param()),
@@ -44,14 +45,14 @@ impl Instruction {
     pub(super) fn exec(self, state: &mut IntcodeProgram) -> Option<Value> {
         let mut output = None;
         match self {
-            Add(a, b, dest) => state.set_reg(dest, state.get_val(a) + state.get_val(b)),
-            Mul(a, b, dest) => state.set_reg(dest, state.get_val(a) * state.get_val(b)),
+            Add(a, b, dest) => dest.set(state, a.get(state) + b.get(state)),
+            Mul(a, b, dest) => dest.set(state, a.get(state) * b.get(state)),
             Input(dest) => {
                 if state.input.len() > 0 {
                     // No longer waiting for input, if we already were
                     state.state = Running;
                     let input = state.input.remove(0);
-                    state.set_reg(dest, input)
+                    dest.set(state, input)
                 } else {
                     if state.state == AwaitingInput {
                         panic!("Awaited input, but didn't get it");
@@ -60,21 +61,21 @@ impl Instruction {
                     state.state = AwaitingInput;
                 }
             },
-            Out(a) => { output = Some(state.get_val(a)) },
+            Out(a) => { output = Some(a.get(state)) },
             JmpTrue(a, ptr) => {
-                if state.get_val(a) != 0 {
-                    state.ptr = state.get_val(ptr).try_into().unwrap();
+                if a.get(state) != 0 {
+                    state.ptr = ptr.get(state).try_into().unwrap();
                 }
             },
             JmpFalse(a, ptr) => {
-                if state.get_val(a) == 0 {
-                    state.ptr = state.get_val(ptr).try_into().unwrap();
+                if a.get(state) == 0 {
+                    state.ptr = ptr.get(state).try_into().unwrap();
                 }
             },
-            Lt(a, b, dest) => state.set_reg(dest, if state.get_val(a) < state.get_val(b) { 1 } else { 0 }),
-            Eq(a, b, dest) => state.set_reg(dest, if state.get_val(a) == state.get_val(b) { 1 } else { 0 }),
+            Lt(a, b, dest) => dest.set(state, if a.get(state) < b.get(state) { 1 } else { 0 }),
+            Eq(a, b, dest) => dest.set(state, if a.get(state) == b.get(state) { 1 } else { 0 }),
             Halt => { state.state = Halted },
-            RelBaseOffset(a) => { state.relative_base += state.get_val(a); },
+            RelBaseOffset(a) => { state.relative_base += a.get(state); },
         };
         output
     }

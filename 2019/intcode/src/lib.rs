@@ -1,8 +1,7 @@
-use std::convert::TryInto;
 mod instruction;
+mod parameter;
 
 pub type Value = i64;
-type Register = usize;
 
 type Program = Vec<Value>;
 
@@ -13,13 +12,6 @@ pub struct IntcodeProgram {
     state: ProgState,
     // Offset applied to memory addresses in relative mode
     relative_base: Value,
-}
-
-#[derive(Debug)]
-enum Parameter {
-    Position(Register),
-    Immediate(Value),
-    Relative(Value),
 }
 
 #[derive(Debug, PartialEq)]
@@ -123,34 +115,6 @@ impl IntcodeProgram {
         self.ptr += 1;
         val
     }
-    fn parse_param(&mut self, mode: Option<char>) -> Parameter {
-        let val = self.read_ptr();
-        match mode {
-            Some('0') => Parameter::Position(val.try_into().unwrap()),
-            Some('1') => Parameter::Immediate(val),
-            Some('2') => Parameter::Relative(val),
-            None => Parameter::Position(val.try_into().unwrap()),
-            Some(x) => panic!("Invalid mode {}", x),
-        }
-    }
-    fn get_val(&self, p: Parameter) -> Value {
-        match p {
-            Parameter::Immediate(v) => v,
-            Parameter::Position(r) => self.read(r),
-            Parameter::Relative(v) => self.read(as_index(self.relative_base + v)),
-        }
-    }
-    fn set_reg(&mut self, r: Parameter, v: Value) {
-        match r {
-            Parameter::Position(r) => self.write(r, v),
-            Parameter::Relative(r) => self.write(as_index(r + self.relative_base),  v),
-            _ => panic!("Not a register when expected"),
-        };
-    }
-}
-
-fn as_index(offset: i64) -> usize {
-    offset.try_into().expect("Invalid index")
 }
 
 #[cfg(test)]
