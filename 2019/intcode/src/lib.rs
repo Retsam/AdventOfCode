@@ -10,13 +10,9 @@ pub struct IntcodeProgram {
     ptr: usize,
     prog: Program,
     input: Vec<Value>,
-    pub state: RunState,
+    state: ProgState,
     // Offset applied to memory addresses in relative mode
     relative_base: Value,
-}
-pub struct ProgramResults {
-    pub prog: Program,
-    pub output: Vec<Value>,
 }
 
 #[derive(Debug)]
@@ -26,12 +22,20 @@ enum Parameter {
     Relative(Value),
 }
 
-#[derive(PartialEq)]
-pub enum RunState {
+#[derive(Debug, PartialEq)]
+pub enum RunResult {
+    Halted,
+    Output(Value),
+    AwaitingInput,
+}
+
+#[derive(PartialEq, Debug)]
+enum ProgState {
     Running,
     Halted,
+    AwaitingInput,
 }
-use RunState::{*};
+use ProgState::{*};
 
 impl IntcodeProgram {
     /** Creation */
@@ -61,34 +65,43 @@ impl IntcodeProgram {
     }
 
     /** Running */
-    pub fn run_until_halt(mut self) -> ProgramResults {
+    // Run until it outputs, halts, or requires input
+    pub fn run(&mut self) -> RunResult {
+        if self.state == Halted {
+            RunResult::Halted
+        } else { loop {
+            if let Some(v) = self.step() {
+                break RunResult::Output(v);
+            }
+            match self.state {
+                Halted => {break RunResult::Halted; },
+                AwaitingInput => { break RunResult::AwaitingInput; },
+                Running => continue,
+            }
+        }}
+    }
+    // Runs the program, collecting all output, assuming all input is provided up front
+    pub fn run_until_halt(&mut self) -> Vec<Value> {
         let mut output = vec!();
         if self.state == Halted {
-            ProgramResults { output, prog: self.prog }
+            panic!("Expected program to be running");
         } else { loop {
-            match self.run_until_output() {
-                None => break ProgramResults { output, prog: self.prog },
-                Some(out) => output.push(out),
+            match self.run() {
+                RunResult::Halted => break output,
+                RunResult::Output(out) => output.push(out),
+                RunResult::AwaitingInput => { panic!("Not enough input"); }
             }
         }}
     }
 
-    pub fn run_until_output(&mut self) -> Option<Value> {
-        loop {
-            let step_result = self.step();
-            if step_result.is_some() || self.state == Halted {
-                break step_result;
-            }
-        }
-    }
-
-    /** Shortcut for run_until_halt().output */
-    pub fn run(self) -> Vec<Value> {
-        self.run_until_halt().output
-    }
-
     pub fn step(&mut self) -> Option<Value> {
         instruction::Instruction::read(self).exec(self)
+    }
+
+    // Get state
+    pub fn get_memory(self) -> Program {
+        let IntcodeProgram { prog, .. } = self;
+        prog
     }
 
     /** Implementation */
@@ -103,6 +116,9 @@ impl IntcodeProgram {
         self.prog[idx] = val
     }
     fn read_ptr(&mut self) -> Value {
+        if self.ptr >= self.prog.len() {
+            panic!("Ptr went beyond memory");
+        }
         let val = self.read(self.ptr);
         self.ptr += 1;
         val
@@ -139,24 +155,24 @@ fn as_index(offset: i64) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{ IntcodeProgram as IC };
+    use super::{ IntcodeProgram as IC, RunResult };
     #[test]
     fn input_output() {
         let prog = "3,0,4,0,3,0,4,0,99";
         assert_eq!(
-            IC::from_str(prog).with_input(&[42, 43]).run(),
+            IC::from_str(prog).with_input(&[42, 43]).run_until_halt(),
             [42, 43]
         );
     }
 
     #[test]
     fn param_modes() {
-        IC::from_vec(vec!(1002,4,3,4,33)).run();
+        IC::from_vec(vec!(1002,4,3,4,33)).run_until_halt();
     }
 
     #[test]
     fn negative_numbers() {
-        IC::from_vec(vec!(1101,100,-1,4,0)).run();
+        IC::from_vec(vec!(1101,100,-1,4,0)).run_until_halt();
     }
 
     #[test]
@@ -164,11 +180,11 @@ mod tests {
         // Tests if input equals 8
         let prog = "3,9,8,9,10,9,4,9,99,-1,8";
         assert_eq!(
-            IC::from_str(prog).with_input(&[8]).run(),
+            IC::from_str(prog).with_input(&[8]).run_until_halt(),
             [1]
         );
         assert_eq!(
-            IC::from_str(prog).with_input(&[7]).run(),
+            IC::from_str(prog).with_input(&[7]).run_until_halt(),
             [0]
         );
     }
@@ -178,11 +194,11 @@ mod tests {
         // Tests if input is less than 8
         let prog = "3,9,7,9,10,9,4,9,99,-1,8";
         assert_eq!(
-            IC::from_str(prog).with_input(&[8]).run(),
+            IC::from_str(prog).with_input(&[8]).run_until_halt(),
             [0]
         );
         assert_eq!(
-            IC::from_str(prog).with_input(&[7]).run(),
+            IC::from_str(prog).with_input(&[7]).run_until_halt(),
             [1]
         );
     }
@@ -190,22 +206,29 @@ mod tests {
     #[test]
     fn test_run_until_output() {
         let mut prog = IC::from_vec(vec!(104, 104, 104, 99, 99));
-        assert_eq!(prog.run_until_output(), Some(104));
-        assert_eq!(prog.run_until_output(), Some(99));
-        assert_eq!(prog.run_until_output(), None);
+        assert_eq!(prog.run(), RunResult::Output(104));
+        assert_eq!(prog.run(), RunResult::Output(99));
+        assert_eq!(prog.run(), RunResult::Halted);
     }
 
     // Tests relative mode, and out-of-bounds reading and writing
     #[test]
     fn quine_test() {
         let prog = vec!(109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99);
-        let out = IC::from_vec(prog.clone()).run();
+        let out = IC::from_vec(prog.clone()).run_until_halt();
         assert_eq!(prog, out);
     }
 
     #[test]
     fn test_large_nums() {
         let prog = vec!(1102,34915192,34915192,7,4,7,99,0);
-        assert_eq!(IC::from_vec(prog).run(), [1219070632396864]);
+        assert_eq!(IC::from_vec(prog).run_until_halt(), [1219070632396864]);
+    }
+
+    #[test]
+    fn partial_input() {
+        let mut prog = IC::from_vec(vec!(3,0,4,0,99));
+        prog.run();
+        assert_eq!(prog.with_input(&[42]).run_until_halt(), [42]);
     }
 }

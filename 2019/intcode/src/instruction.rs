@@ -1,5 +1,5 @@
 use std::convert::TryInto;
-use super::{Value, IntcodeProgram, Parameter, RunState::{*}};
+use super::{Value, IntcodeProgram, Parameter, ProgState::{*}};
 
 #[derive(Debug)]
 pub(super) enum Instruction {
@@ -47,8 +47,18 @@ impl Instruction {
             Add(a, b, dest) => state.set_reg(dest, state.get_val(a) + state.get_val(b)),
             Mul(a, b, dest) => state.set_reg(dest, state.get_val(a) * state.get_val(b)),
             Input(dest) => {
-                let input = state.input.remove(0);
-                state.set_reg(dest, input)
+                if state.input.len() > 0 {
+                    // No longer waiting for input, if we already were
+                    state.state = Running;
+                    let input = state.input.remove(0);
+                    state.set_reg(dest, input)
+                } else {
+                    if state.state == AwaitingInput {
+                        panic!("Awaited input, but didn't get it");
+                    }
+                    state.ptr -= 2;
+                    state.state = AwaitingInput;
+                }
             },
             Out(a) => { output = Some(state.get_val(a)) },
             JmpTrue(a, ptr) => {

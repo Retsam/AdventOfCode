@@ -7,13 +7,11 @@ fn main() -> io::Result<()> {
 
     let line = buffer.lines().next().unwrap();
 
-    let test_out = IntcodeProgram::from_str(line).with_input(&[1]).run();
+    let test_out = IntcodeProgram::from_str(line).with_input(&[1]).run_until_halt();
     println!("Test output is {}", test_out[0]);
 
-    let output = IntcodeProgram::from_str(line).with_input(&[2]).run();
+    let output = IntcodeProgram::from_str(line).with_input(&[2]).run_until_halt();
     println!("Coordinates are {}", output[0]);
-
-
 
     Ok(())
 }

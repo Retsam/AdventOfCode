@@ -5,9 +5,9 @@ use intcode::{Value, IntcodeProgram};
 const PART_2: bool = true;
 
 fn run(prog: Vec<Value>) -> Value {
-    IntcodeProgram::from_vec(prog)
-        .run_until_halt()
-        .prog[0]
+    let mut prog = IntcodeProgram::from_vec(prog);
+    prog.run();
+    prog.get_memory()[0]
 }
 
 fn main() -> io::Result<()> {

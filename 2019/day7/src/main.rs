@@ -1,5 +1,5 @@
 use std::io::{self, Read};
-use intcode::{ IntcodeProgram };
+use intcode::{ IntcodeProgram, RunResult };
 
 const PART_2: bool = true;
 type AmpOrder = [intcode::Value; 5];
@@ -29,7 +29,7 @@ fn test_order(order: AmpOrder, prog: &str) -> intcode::Value {
     for phase_setting in &order {
         let output = IntcodeProgram::from_str(prog)
             .with_input(&[*phase_setting, input_val])
-            .run();
+            .run_until_halt();
         input_val = output[0];
     }
     input_val
@@ -45,9 +45,10 @@ fn test_order_advanced(order: AmpOrder, prog: &str) -> intcode::Value {
     let mut input_val = 0;
     for i in (0..5).cycle() {
         progs[i].add_input(&[input_val]);
-        match progs[i].run_until_output() {
-            None => break,
-            Some(v) => { input_val = v; },
+        match progs[i].run() {
+            RunResult::Halted => break,
+            RunResult::Output(v) => { input_val = v; },
+            RunResult::AwaitingInput => panic!("Not enough input"),
         }
     }
     input_val
