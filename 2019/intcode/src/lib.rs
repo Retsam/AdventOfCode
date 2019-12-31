@@ -56,6 +56,10 @@ impl IntcodeProgram {
         self.input.extend_from_slice(input)
     }
 
+    pub fn is_running(&self) -> bool {
+        self.state != Halted
+    }
+
     /** Running */
     // Run until it outputs, halts, or requires input
     pub fn run(&mut self) -> RunResult {
@@ -79,9 +83,9 @@ impl IntcodeProgram {
             panic!("Expected program to be running");
         } else { loop {
             match self.run() {
-                RunResult::Halted => break output,
                 RunResult::Output(out) => output.push(out),
-                RunResult::AwaitingInput => { panic!("Not enough input"); }
+                RunResult::Halted => break output,
+                RunResult::AwaitingInput => break output,
             }
         }}
     }
