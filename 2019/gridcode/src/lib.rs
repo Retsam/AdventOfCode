@@ -26,13 +26,18 @@ fn boundaries<T>(grid: &HashMap<Coord, T>) -> GridBounds {
 }
 
 pub fn print<T: GridCode>(grid: &HashMap<Coord, T>, default: &T) -> String {
+    print_with_overrides(grid, &HashMap::new(), default)
+}
+pub fn print_with_overrides<T: GridCode>(grid: &HashMap<Coord, T>, overrides: &HashMap<Coord, char>, default: &T) -> String {
     let bounds = boundaries(grid);
     let mut out = String::new();
 
     for y in bounds.min_y..=bounds.max_y {
         for x in bounds.min_x..=bounds.max_x {
-            let tile = grid.get(&Coord::new(x, y)).unwrap_or(default);
-            out.push(tile.grid_code())
+            let coord = &Coord::new(x, y);
+            out.push(overrides.get(coord).cloned().unwrap_or_else(|| {
+                grid.get(coord).unwrap_or(default).grid_code()
+            }));
         }
         out.push('\n');
     }
@@ -88,5 +93,8 @@ impl Coord {
             Left  => Coord { x: x - 1, y },
             Right => Coord { x: x + 1, y },
         }
+    }
+    pub fn neighbors(&self) -> [Coord; 4] {
+        [self.go(Up), self.go(Right), self.go(Down), self.go(Left)]
     }
 }
