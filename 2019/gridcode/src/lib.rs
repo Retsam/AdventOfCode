@@ -60,14 +60,14 @@ impl Dir {
             Left => Down,
         }
     }
-    // pub fn rev(self) -> Dir {
-    //     match self {
-    //         Up => Down,
-    //         Down => Up,
-    //         Right => Left,
-    //         Left => Right,
-    //     }
-    // }
+    pub fn rev(self) -> Dir {
+        match self {
+            Up => Down,
+            Down => Up,
+            Right => Left,
+            Left => Right,
+        }
+    }
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]

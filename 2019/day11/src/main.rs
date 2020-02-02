@@ -1,10 +1,9 @@
 use std::io::{self, Read};
-mod grid;
 
 use intcode::{ IntcodeProgram, RunResult };
 use std::collections::HashMap;
 use std::collections::HashSet;
-use grid::{Coord, Dir, GridCode};
+use gridcode::{Coord, Dir, GridCode};
 
 use Dir::{*};
 
@@ -72,6 +71,6 @@ fn main() -> io::Result<()> {
     }
 
     println!("Painted {} tiles", state.painted.len());
-    println!("{}", grid::print(&state.grid, &Black));
+    println!("{}", gridcode::print(&state.grid, &Black));
     Ok(())
 }

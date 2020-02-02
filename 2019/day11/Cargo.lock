@@ -4,8 +4,13 @@
 name = "day11"
 version = "0.1.0"
 dependencies = [
+ "gridcode 0.1.0",
  "intcode 0.1.0",
 ]
+
+[[package]]
+name = "gridcode"
+version = "0.1.0"
 
 [[package]]
 name = "intcode"
