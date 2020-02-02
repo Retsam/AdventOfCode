@@ -7,7 +7,7 @@ use std::collections::HashMap;
 #[derive(Debug)]
 struct Quantity {
     material: String,
-    quantity: u32,
+    quantity: u64,
 }
 impl FromStr for Quantity {
     type Err = ParseIntError;
@@ -53,11 +53,11 @@ impl fmt::Display for Reaction {
 }
 
 struct State {
-    ore_cost: u32,
-    stockpile: HashMap<String, u32>,
+    ore_cost: u64,
+    stockpile: HashMap<String, u64>,
 }
 impl State {
-    fn produce_fuel(amount: u32, recipes: &Vec<Reaction>) -> u32 {
+    fn produce_fuel(amount: u64, recipes: &Vec<Reaction>) -> u64 {
         let mut state = State {
             ore_cost: 0,
             stockpile: HashMap::new(),
@@ -98,6 +98,11 @@ impl State {
     }
 }
 
+const A_TRILLION: u64 = 1_000_000_000_000;
+fn uses_a_trillion_fuel(amount: u64, recipes: &Vec<Reaction>) -> bool {
+    State::produce_fuel(amount, &recipes) > A_TRILLION
+}
+
 fn main() -> io::Result<()> {
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
@@ -105,6 +110,25 @@ fn main() -> io::Result<()> {
         .map(|l| l.parse::<Reaction>().unwrap())
         .collect::<Vec<_>>();
 
-    println!("One unit of fuel requires {} ORE", State::produce_fuel(1, &recipes));
+    let min_cost = State::produce_fuel(1, &recipes);
+    println!("One unit of fuel requires {} ORE", min_cost);
+
+    let mut fuel_to_produce = A_TRILLION / min_cost;
+    println!("{} FUEL costs {}", fuel_to_produce, State::produce_fuel(fuel_to_produce, &recipes));
+
+    while !uses_a_trillion_fuel(fuel_to_produce+1000, &recipes) {
+        fuel_to_produce += 1000
+    }
+    while !uses_a_trillion_fuel(fuel_to_produce+100, &recipes) {
+        fuel_to_produce += 100
+    }
+    while !uses_a_trillion_fuel(fuel_to_produce+10, &recipes) {
+        fuel_to_produce += 10
+    }
+    while !uses_a_trillion_fuel(fuel_to_produce+1, &recipes) {
+        fuel_to_produce += 1
+    }
+    println!("{} FUEL costs {}", fuel_to_produce, State::produce_fuel(fuel_to_produce, &recipes));
+
     Ok(())
 }
