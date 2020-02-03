@@ -1,15 +1,21 @@
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::io::{self, Read};
+use std::cmp::{max};
 use gridcode::Coord;
 use intcode::IntcodeProgram;
 use intcode::RunResult::{*};
 
 #[derive(PartialEq)]
-enum Tile { Empty, Wall, Unknown }
+enum Tile { Empty, Wall, Unknown, Oxygen }
 impl gridcode::GridCode for Tile {
     fn grid_code(&self) -> char {
-        match self { Tile::Empty => '.', Tile::Wall => '#', Tile::Unknown => '?' }
+        match self {
+            Tile::Empty => '.',
+            Tile::Wall => '#',
+            Tile::Unknown => '?',
+            Tile::Oxygen => 'O'
+        }
     }
 }
 
@@ -22,9 +28,10 @@ struct ToExplore {
 
 struct State {
     pos: Coord,
-    map: HashMap<Coord, Tile>,
+    map: gridcode::Grid<Tile>,
     explore_queue: VecDeque<ToExplore>,
     prog: IntcodeProgram,
+    oxygen_vent: Option<(Coord, u32)>,
 }
 
 impl State {
@@ -58,27 +65,29 @@ impl State {
             panic!("Prog stopped for input or halted unexpectedly")
         }
     }
-    fn do_explore(&mut self) -> u32 {
-        self.print();
 
-        let ToExplore { from, to, dist } = self.explore_queue.pop_front()
-            .expect("Nowhere to explore");
-        self.return_to(from);
-        match self.move_to(to) {
-            0 => {
-                self.map.insert(to, Tile::Wall);
-                self.do_explore()
+    fn do_explore(&mut self) {
+        while let Some(ToExplore { from, to, dist }) = self.explore_queue.pop_front() {
+            self.print();
+
+            self.return_to(from);
+            match self.move_to(to) {
+                0 => {
+                    self.map.insert(to, Tile::Wall);
+                }
+                1 => {
+                    self.map.insert(to, Tile::Empty);
+                    self.pos = to;
+                    self.explore_from(to, dist + 1);
+                }
+                2 => {
+                    self.map.insert(to, Tile::Empty);
+                    self.pos = to;
+                    self.explore_from(to, dist + 1);
+                    self.oxygen_vent = Some((to, dist));
+                }
+                x => panic!("Unexpected output {}", x)
             }
-            1 => {
-                self.map.insert(to, Tile::Empty);
-                self.pos = to;
-                self.explore_from(to, dist + 1);
-                self.do_explore()
-            }
-            2 => {
-                dist
-            }
-            x => panic!("Unexpected output {}", x)
         }
     }
     fn return_to(&mut self, point: Coord) {
@@ -91,10 +100,29 @@ impl State {
         for coord in path {
             match self.move_to(coord) {
                 1 => { self.pos = coord; },
+                2 => { self.pos = coord; },
                 _ => panic!("Failed to return")
             }
         }
     }
+}
+
+fn fill_oxygen(mut map: HashMap<Coord, Tile>, vent: Coord) -> u32 {
+    let mut search_queue = vec!();
+    let mut max_dist = 0;
+    map.insert(vent, Tile::Oxygen);
+    search_queue.push((vent, 0));
+    while let Some((coord, dist)) = search_queue.pop() {
+        for neighbor in coord.neighbors().iter().cloned() {
+            if let Some(Tile::Empty) = map.get(&neighbor) {
+                map.insert(neighbor, Tile::Oxygen);
+                max_dist = max(max_dist, dist + 1);
+                search_queue.push((neighbor, dist + 1));
+                println!("{}", gridcode::print(&map, &Tile::Unknown));
+            }
+        }
+    }
+    max_dist
 }
 
 fn main() -> io::Result<()> {
@@ -109,14 +137,20 @@ fn main() -> io::Result<()> {
         pos: origin,
         map: HashMap::new(),
         explore_queue: VecDeque::new(),
-        prog
+        prog,
+        oxygen_vent: None
     };
     state.map.insert(origin, Tile::Empty);
     state.explore_from(origin, 1);
-    let dist = state.do_explore();
+
+    state.do_explore();
 
     state.print();
-    println!("Found oxygen system at {} distance", dist);
+    let (vent, dist) = state.oxygen_vent.expect("Failed to find vent");
+    println!("Found oxygen system at {} ({} distance)", vent, dist);
+
+    let time = fill_oxygen(state.map, vent);
+    println!("Filled with oxygen after {}", time);
 
     Ok(())
 }
