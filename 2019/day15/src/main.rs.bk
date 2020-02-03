@@ -1,0 +1,80 @@
+use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::io::{self, Read};
+use gridcode::Coord;
+use intcode::IntcodeProgram;
+
+enum Tile { Empty, Wall }
+impl gridcode::GridCode for Tile {
+    fn grid_code(&self) -> char {
+        match self { Tile::Empty => ' ', Tile::Wall => '#' }
+    }
+}
+
+#[derive(Debug)]
+struct ToExplore {
+    from: Coord,
+    to: Coord,
+    dist: u32,
+}
+
+struct State {
+    pos: Coord,
+    map: HashMap<Coord, Tile>,
+    explore_queue: VecDeque<ToExplore>,
+    prog: IntcodeProgram,
+}
+
+impl State {
+    fn explore_from(&mut self, coord: Coord, dist: u32) {
+        self.explore_queue.append(
+            &mut coord.neighbors().into_iter()
+                .filter(|c| !self.map.contains_key(c))
+                .map(|c| ToExplore {
+                    from: coord,
+                    to: *c,
+                    dist
+                }).collect()
+        );
+    }
+    fn do_explore(&mut self) {
+        let ToExplore { from, to, dist } = self.explore_queue.pop_front()
+            .expect("Nowhere to explore");
+        self.return_to(from);
+        let input = if to.y < from.y { 1 }
+        else if to.y > from.y { 2 }
+        else if to.x < from.x { 3 }
+        else { 4 };
+
+        println!("Inputting {}", input);
+    }
+    fn return_to(&mut self, point: Coord) {
+        if self.pos == point {
+            return;
+        }
+        panic!("TODO");
+    }
+}
+
+fn main() -> io::Result<()> {
+    let mut buffer = String::new();
+    io::stdin().read_to_string(&mut buffer)?;
+    let line = buffer.lines().next().unwrap();
+    let prog = IntcodeProgram::from_str(line);
+
+    let origin = Coord::new(0, 0);
+
+    let mut state = State {
+        pos: origin,
+        map: HashMap::new(),
+        explore_queue: VecDeque::new(),
+        prog
+    };
+    state.map.insert(origin, Tile::Empty);
+    state.explore_from(origin, 1);
+    state.do_explore();
+
+    println!("{}", gridcode::print(&state.map, &Tile::Empty));
+
+    Ok(())
+}
