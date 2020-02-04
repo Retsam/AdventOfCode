@@ -43,22 +43,69 @@ impl Iterator for FFT {
     }
 }
 
+#[derive(Debug)]
+struct SuperFFT(Vec<i32>, i32);
+
+impl SuperFFT {
+    fn new(input: &Vec<i32>, range: std::ops::Range<usize>) -> SuperFFT {
+        let mut sum = 0;
+        let vec: Vec<_> = range.map(|i| {
+            let v = input[i % input.len()];
+            sum = (sum + v) % 10;
+            v
+        }).collect();
+        SuperFFT(vec, sum)
+    }
+}
+
+impl Iterator for SuperFFT {
+    type Item = Vec<i32>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let input = &self.0;
+        let mut sum = self.1;
+        let mut new_sum = 0;
+        let new: Vec<_> = input.iter()
+            .map(|v| {
+                let n = sum;
+                new_sum = (new_sum + n) % 10;
+                sum = (sum - v + 10) % 10;
+                n
+            }).collect();
+        self.0 = new;
+        self.1 = new_sum;
+
+        Some(self.0.clone())
+    }
+}
+
 fn main() -> io::Result<()> {
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
     let line = buffer.lines().next().unwrap();
 
-    let mut fft = FFT(
-        line.chars()
-            .map(|x| x.to_digit(10).unwrap() as i32)
-            .collect()
-    );
+    let input: Vec<_> = line.chars()
+        .map(|x| x.to_digit(10).unwrap() as i32)
+        .collect();
+    let offset: usize = line.chars().take(7).collect::<String>().parse().unwrap();
+
+    let mut fft = FFT(input.clone());
     let result: String = fft.nth(99)
         .unwrap()
         // vec to string
-        .iter().map(|x| x.to_string())
-        .take(8).collect();
-    println!("{}", result);
+        .iter().take(8).map(|x| x.to_string()).collect();
+    println!("Part 1 - {}", result);
+
+    let mut super_fft = SuperFFT::new(&input, offset..input.len()*10000);
+    for _ in 0..100 {
+        super_fft.next();
+    }
+
+    let SuperFFT(res, _) = super_fft;
+    let code: String = res.iter().cloned()
+        .take(8)
+        .map(|x| x.to_string())
+        .collect();
+    println!("Part 2 - {}", code);
 
     Ok(())
 }
