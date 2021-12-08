@@ -31,19 +31,12 @@ const p2 = _.sum(
     map.c = countSegment(onePattern[0]) === 8 ? onePattern[0] : onePattern[1];
 
     // Use the four pattern (known by length) to identify d
-    const uniqueToFour = _.difference(
-      inp.find((x) => x.length === 4).split(""),
-      onePattern
-    );
-    // either b or d, but only d is used 7 times
-    map.d =
-      countSegment(uniqueToFour[0]) === 7 ? uniqueToFour[0] : uniqueToFour[1];
+    //  d is the only segment in four that's in 7 digits
+    const fourPattern = inp.find((x) => x.length === 4).split("");
+    map.d = fourPattern.find((c) => countSegment(c) === 7);
 
-    // Use the nine pattern to identify e (the only segment it doesn't have)
-    const ninePattern = inp
-      .find((x) => x.length === 6 && x.includes(map.d) && x.includes(map.c))
-      .split("");
-    map.e = _.difference("abcdefg".split(""), ninePattern)[0];
+    // e is the only segment that only appears 4 times
+    map.e = "abcdefg".split("").find((c) => countSegment(c) === 4);
 
     const getNumber = (pattern) => {
       if (pattern.length === 5) {
