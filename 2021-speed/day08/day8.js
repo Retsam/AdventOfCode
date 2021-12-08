@@ -21,22 +21,22 @@ const p2 = _.sum(
     // mapping from normal segment to the corresponding segment in the input, we need c,d,e
     let map = {};
 
-    // Count how many numbers a segment is included in
-    const countSegment = (c) =>
-      _.filter(inp.join("").split(""), (x) => x === c).length;
+    // Count how many (input) numbers a segment is included in
+    const byUsageInDigits = (num) => (seg) =>
+      _.filter(inp.join("").split(""), (other) => seg === other).length === num;
 
     // Identify which 1 segment is c, based on usage
     // (The f segment is in 9 digits, the c segment is only in 8)
     const onePattern = inp.find((x) => x.length === 2).split("");
-    map.c = countSegment(onePattern[0]) === 8 ? onePattern[0] : onePattern[1];
+    map.c = onePattern.find(byUsageInDigits(8));
 
     // Use the four pattern (known by length) to identify d
     //  d is the only segment in four that's in 7 digits
     const fourPattern = inp.find((x) => x.length === 4).split("");
-    map.d = fourPattern.find((c) => countSegment(c) === 7);
+    map.d = fourPattern.find(byUsageInDigits(7));
 
     // e is the only segment that only appears 4 times
-    map.e = "abcdefg".split("").find((c) => countSegment(c) === 4);
+    map.e = "abcdefg".split("").find(byUsageInDigits(4));
 
     const getNumber = (pattern) => {
       if (pattern.length === 5) {
