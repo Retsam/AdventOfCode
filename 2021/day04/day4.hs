@@ -13,12 +13,13 @@ main = do
   let (nums, boards) = runParser parseInput input
   let initState = (Set.empty, nums, boards)
   print $ part1 initState
+  print $ part2 initState
 
 -- part 1
 
 part1 :: State -> Int
 part1 initState =
-  fromLeft (error "Expeceted a score") result
+  fromLeft (error "Expected a score") result
   where
     result = sequence $ iterateM step (Right initState)
 
@@ -41,10 +42,15 @@ step (_, [], _) = error "Ran out of numbers"
 score :: Set Int -> [[Int]] -> Int
 score drawn = sum . filter (not . (`member` drawn)) . concat
 
-iterateM :: (Monad m) => (a -> m a) -> m a -> [m a]
-iterateM f init =
-  let m = init >>= f
-   in m : iterateM f m
+--- part 2
+
+part2 :: State -> Int
+part2 (drawn, called, [board]) = part1 (drawn, called, [board])
+part2 (drawn, toCall : rest, boards) =
+  part2 (newDrawn, rest, filter (not . wins newDrawn) boards)
+  where
+    newDrawn = Set.insert toCall drawn
+part2 (_, [], _) = error "Ran out of numbers"
 
 -- parsing
 
@@ -76,3 +82,10 @@ runParser parser input =
     [(xs, "")] -> xs
     [] -> error "Input parse error"
     _ -> error "Didn't consume whole input"
+
+--- utils
+
+iterateM :: (Monad m) => (a -> m a) -> m a -> [m a]
+iterateM f init =
+  let m = init >>= f
+   in m : iterateM f m
