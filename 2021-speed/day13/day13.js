@@ -8,7 +8,16 @@ const path = "example.txt";
 //*/
 const input = fs.readFileSync(nodePath.join(__dirname, path)).toString().trim();
 
+// Plotting util
 const range = (a, b) => Array.from(new Array(b - a)).map((_, i) => i + a);
+const diagram = ({ xMin = 0, xMax, yMin = 0, yMax }, charFunc) =>
+  range(yMin, yMax + 1)
+    .map((y) =>
+      range(xMin, xMax + 1)
+        .map((x) => charFunc([x, y]))
+        .join("")
+    )
+    .join("\n");
 
 let [dots, ins] = input.split("\n\n");
 dots = dots.split("\n").map((l) => l.split(",").map((x) => +x));
@@ -37,14 +46,9 @@ const [xMax, yMax] = [
   Math.max(...dots.map((d) => d[0])),
   Math.max(...dots.map((d) => d[1])),
 ];
-const output = range(0, yMax + 1)
-  .map((y) => {
-    return range(0, xMax + 1)
-      .map((x) => {
-        return dots.find((d) => d[0] === x && d[1] === y) ? "#" : " ";
-      })
-      .join("");
-  })
-  .join("\n");
 
-console.log(output);
+console.log(
+  diagram({ xMax, yMax }, ([x, y]) =>
+    dots.find((d) => d[0] === x && d[1] === y) ? "#" : " "
+  )
+);
