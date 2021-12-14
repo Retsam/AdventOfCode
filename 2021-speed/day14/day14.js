@@ -16,21 +16,10 @@ let template = input[0];
 const rules = input.slice(2).map((r) => r.split(" -> "));
 
 // Convert "ABCB" into {A: 1, B: 2, C: 1}
-const getCounts = (str) => {
-  return str.split("").reduce((cts, c) => {
-    cts[c] = (cts[c] ?? 0) + 1;
-    return cts;
-  }, {});
-};
+const getCounts = (str) => _.mapValues(_.groupBy(str), "length");
 
 // Combine {A: 1, B: 1} and {B: 1, C: 1} into {A: 1, B: 2, C: 1}
-const combineCounts = (cts) =>
-  cts.reduce((counts, newCounts) => {
-    for (const c of Object.keys(newCounts)) {
-      counts[c] = (counts[c] ?? 0) + newCounts[c];
-    }
-    return counts;
-  }, {});
+const combineCounts = (cts) => _.mergeWith({}, ...cts, (a = 0, b = 0) => a + b);
 
 // Solve a particular pair, simulating n generations, return the counts, memoize the result
 const solvePair = _.memoize(
