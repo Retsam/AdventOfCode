@@ -18,8 +18,6 @@ const hexToBin = (x) =>
 
 const parse = (ph, part1) => {
   let binStr = hexToBin(ph);
-  // pad to multiple of four bits
-  binStr = binStr.padStart(Math.ceil(binStr.length / 4) * 4, "0");
 
   // Keep the pointer of our current position in the string
   let c = 0;
