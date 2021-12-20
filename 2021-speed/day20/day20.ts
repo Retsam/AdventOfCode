@@ -18,9 +18,6 @@ type Coord = [number, number];
 
 const toStr = (coord: Coord) => JSON.stringify(coord);
 
-const range = (a: number, b: number) =>
-  Array.from(new Array(b - a)).map((_, i) => i + a);
-
 const bounds = (_data: Set<string>) => {
   const data = Array.from(_data).map((c) => JSON.parse(c) as Coord);
   return {
@@ -30,18 +27,6 @@ const bounds = (_data: Set<string>) => {
     yMax: _.max(data.map((c) => c[1])),
   };
 };
-
-const diagram = (
-  { xMin = 0, xMax, yMin = 0, yMax },
-  charFunc: (c: Coord) => string
-) =>
-  range(yMin, yMax + 1)
-    .map((y) =>
-      range(xMin, xMax + 1)
-        .map((x) => charFunc([x, y]))
-        .join("")
-    )
-    .join("\n");
 
 let imageData = new Set<string>();
 image.split("\n").flatMap((line, y) =>
@@ -84,14 +69,6 @@ const calculateGeneration = (g: number) => {
     }
   }
   return img;
-};
-
-const show = (imageData: Set<string>) => {
-  console.log(
-    diagram(bounds(imageData), (coord) =>
-      imageData.has(toStr(coord)) ? "#" : "."
-    )
-  );
 };
 
 const gen2 = calculateGeneration(2);
