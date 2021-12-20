@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import * as nodePath from "path";
 import * as _ from "lodash";
-import { dir } from "console";
 
 /*
 const path = "input.txt";

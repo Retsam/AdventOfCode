@@ -21,9 +21,6 @@ const toStr = (coord: Coord) => JSON.stringify(coord);
 const range = (a: number, b: number) =>
   Array.from(new Array(b - a)).map((_, i) => i + a);
 
-const neighbors = ([x, y]: Coord): Coord[] =>
-  [-1, 0, 1].flatMap((dx, _, arr) => arr.map<Coord>((dy) => [x + dy, y + dx]));
-
 const bounds = (_data: Set<string>) => {
   const data = Array.from(_data).map((c) => JSON.parse(c) as Coord);
   return {
@@ -56,15 +53,23 @@ image.split("\n").flatMap((line, y) =>
 );
 
 const calcValue = _.memoize(
-  (coord: Coord, generation: number) => {
+  ([x, y]: Coord, generation: number) => {
     if (generation === 0) {
-      return imageData.has(toStr(coord)) ? "#" : ".";
+      return imageData.has(toStr([x, y])) ? "#" : ".";
     }
-    const bits = neighbors(coord)
-      .map((n) => (calcValue(n, generation - 1) === "#" ? "1" : "0"))
-      .join("");
-    return algo[parseInt(bits, 2)];
+    let i = 0;
+    let bitVal = 0;
+    for (let dy = 1; dy >= -1; dy--) {
+      for (let dx = 1; dx >= -1; dx--) {
+        if (calcValue([x + dx, y + dy], generation - 1) === "#") {
+          bitVal += Math.pow(2, i);
+        }
+        i++;
+      }
+    }
+    return algo[bitVal];
   },
+  // Memoize by both the coordinate and the generation
   (coord, gen) => [coord, gen].join(",")
 );
 
