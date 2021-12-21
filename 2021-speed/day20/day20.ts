@@ -37,33 +37,42 @@ image.split("\n").flatMap((line, y) =>
   })
 );
 
-const calcValue = _.memoize(
-  ([x, y]: Coord, generation: number) => {
-    if (generation === 0) {
-      return imageData.has(toStr([x, y])) ? "#" : ".";
-    }
+// Using a custom cache setup instead of `_.memoize` because it takes execution from ~20s -> ~12s
+const genCache = new Map<string, boolean>();
+const getFromCache = (key: string, calc: () => boolean) => {
+  let res = genCache.get(key);
+  if (res === undefined) {
+    res = calc();
+    genCache.set(key, res);
+  }
+  return res;
+};
+
+const calcValue = ([x, y]: Coord, generation: number) => {
+  if (generation === 0) {
+    return imageData.has(toStr([x, y]));
+  }
+  return getFromCache(`${generation},${x},${y}`, () => {
     let i = 0;
     let bitVal = 0;
     for (let dy = 1; dy >= -1; dy--) {
       for (let dx = 1; dx >= -1; dx--) {
-        if (calcValue([x + dx, y + dy], generation - 1) === "#") {
+        if (calcValue([x + dx, y + dy], generation - 1)) {
           bitVal += Math.pow(2, i);
         }
         i++;
       }
     }
-    return algo[bitVal];
-  },
-  // Memoize by both the coordinate and the generation
-  (coord, gen) => [coord, gen].join(",")
-);
+    return algo[bitVal] === "#";
+  });
+};
 
 const calculateGeneration = (g: number) => {
   const b = bounds(imageData);
   const img = new Set<string>();
   for (let x = b.xMin - g; x <= b.xMax + g; x++) {
     for (let y = b.yMin - g; y <= b.yMax + g; y++) {
-      if (calcValue([x, y], g) === "#") {
+      if (calcValue([x, y], g)) {
         img.add(toStr([x, y]));
       }
     }
