@@ -25,13 +25,18 @@ const rollNormalDice = (): DiceResult[] => [
   [normalDie.next().value + normalDie.next().value + normalDie.next().value, 1],
 ];
 
-const diractDiceRolls = [1, 2, 3].flatMap((x, i, a) =>
+// Get a list of all outcomes [3,4,5,4,...9]
+const diracDiceRolls = [1, 2, 3].flatMap((x, i, a) =>
   a.flatMap((y) => a.flatMap((z) => x + y + z))
 );
-const diracDiceResults = _.toPairs(
-  _.mapValues(_.groupBy(diractDiceRolls), "length")
-).map<DiceResult>(([roll, times]) => [parseInt(roll), times]);
+
+// convert to a list of [roll, frequency] pairs, i.e. [[3, 1], [4, 3]... etc
+const diracDiceResults = _.map(
+  _.groupBy(diracDiceRolls), // returns { 3: [3], 4: [4,4,4], ...}
+  (rolls): DiceResult => [rolls[0], rolls.length]
+);
 const rollDiracDice = () => diracDiceResults;
+diracDiceResults;
 
 const move = ([pos, score]: PlayerState, roll: number): PlayerState => {
   let newPos = pos + roll;
