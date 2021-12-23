@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import * as nodePath from "path";
 import * as _ from "lodash";
-import { initial, map } from "lodash";
 
 /*
 const path = "input.txt";
@@ -116,7 +115,7 @@ const addSection = (tree: Tree, toAdd: Bounds3, state: "on" | "off") => {
         const radius = Math.floor(tree.radius / 2);
         // prettier-ignore
         const center: Coord = [region[0][0] + radius, region[1][0] + radius, region[2][0] + radius];
-        tree.subTrees[i] = subTree = {
+        tree.subTrees[i] = subTree = ({
           state: tree.state,
           radius,
           center,
