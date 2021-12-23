@@ -186,8 +186,13 @@ const setPos = (pos: Pos, mob: Mob | null, state: State) => {
   state[0][pos.slot] = mob;
 };
 
+const clone = (state: State): State => [
+  state[0].slice(),
+  state[1].map(({ slot, spaces }) => ({ slot, spaces: spaces.slice() })),
+];
 function makeMove(state: State, [from, to]: Move) {
-  const newState = JSON.parse(JSON.stringify(state));
+  const newState = clone(state);
+
   setPos(to, getPos(from, newState), newState);
   setPos(from, null, newState);
   return newState;
