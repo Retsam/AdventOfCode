@@ -1,6 +1,5 @@
 import * as fs from "fs";
 import * as nodePath from "path";
-import * as _ from "lodash";
 
 //*
 const path = "input.txt";
@@ -13,19 +12,24 @@ let data = fs
   .trim()
   .split("\n");
 
-let roomSize = 2;
+const range = (a: number, b: number) =>
+  Array.from(new Array(b - a)).map((_, i) => i + a);
 
-const hallways: Hallway = Array.from({ length: 11 }).map((x, i) => {
-  const mob = data[1][i + 1];
-  return mob === "." ? null : (mob as Mob);
-});
-const rooms: Room[] = [2, 4, 6, 8].map((slot) => ({
-  slot,
-  spaces: _.range(roomSize).map((space) => {
-    const mob = data[2 + space][slot + 1];
+function parseData(data: string[]) {
+  const roomSize = data.length - 3;
+  const hallways: Hallway = Array.from({ length: 11 }).map((x, i) => {
+    const mob = data[1][i + 1];
     return mob === "." ? null : (mob as Mob);
-  }),
-}));
+  });
+  const rooms: Room[] = [2, 4, 6, 8].map((slot) => ({
+    slot,
+    spaces: range(0, roomSize).map((space) => {
+      const mob = data[2 + space][slot + 1];
+      return mob === "." ? null : (mob as Mob);
+    }),
+  }));
+  return [hallways, rooms] as const;
+}
 
 type Mob = "A" | "B" | "C" | "D";
 type Room = {
@@ -40,29 +44,29 @@ type Pos = RoomPos | HallPos;
 
 type State = readonly [Hallway, Room[]];
 
-const show = (state: State) => {
-  let lines = ["#############"];
-  lines.push(`#${state[0].map((m) => m ?? ".").join("")}#`);
-  for (let i = 0; i < roomSize; i++) {
-    let roomValues = [];
-    for (let ri = 0; ri < 4; ri++) {
-      roomValues.push(state[1][ri].spaces[i] ?? ".");
-    }
-    lines.push(
-      i === 0
-        ? `###${roomValues.join("#")}###`
-        : `  #${roomValues.join("#")}#  `
-    );
-  }
-  lines.push("  #########  ");
-  console.log(lines.join("\n"));
-};
+// const show = (state: State) => {
+//   let lines = ["#############"];
+//   lines.push(`#${state[0].map((m) => m ?? ".").join("")}#`);
+//   for (let i = 0; i < roomSize; i++) {
+//     let roomValues = [];
+//     for (let ri = 0; ri < 4; ri++) {
+//       roomValues.push(state[1][ri].spaces[i] ?? ".");
+//     }
+//     lines.push(
+//       i === 0
+//         ? `###${roomValues.join("#")}###`
+//         : `  #${roomValues.join("#")}#  `
+//     );
+//   }
+//   lines.push("  #########  ");
+//   console.log(lines.join("\n"));
+// };
 
 const hallSpaces = new Set([0, 1, 3, 5, 7, 9, 10]);
 const slotForRoomIdx = (i: number) => i * 2 + 2;
 
 const backMostOpenSpace = (room: Room) => {
-  for (let s = roomSize - 1; s >= 0; s--) {
+  for (let s = room.spaces.length - 1; s >= 0; s--) {
     if (!room.spaces[s]) return s;
   }
   return undefined;
@@ -78,8 +82,10 @@ function legalMoves(pos: Pos, [hall, rooms]: State): Pos[] {
     let goalRoomIdx = "ABCD".indexOf(mob);
     const goalRoom = rooms[goalRoomIdx];
     if (goalRoomIdx === pos.index) {
-      if (pos.space === 1) return [];
-      if (spaces[1] === mob) return [];
+      let isBlocking = goalRoom.spaces
+        .slice(pos.space + 1)
+        .some((m) => m !== mob);
+      if (!isBlocking) return [];
     }
     const goalRoomValid = goalRoom.spaces.every((m) => !m || m === mob);
     let i = pos.space - 1;
@@ -135,8 +141,9 @@ function* allLegalMoves(state: State): Generator<Move> {
     }
   }
 
+  const roomSize = state[1][0].spaces.length;
   for (let i = 0; i < 4; i++) {
-    for (const space of _.range(roomSize)) {
+    for (const space of range(0, roomSize)) {
       let currentPos: Pos = { kind: "room", index: i, space };
       for (const move of legalMoves(currentPos, state)) {
         yield [currentPos, move];
@@ -145,10 +152,7 @@ function* allLegalMoves(state: State): Generator<Move> {
   }
 }
 
-function isSolved([hall, rooms]: State) {
-  if (hall.some((x) => x)) {
-    return false;
-  }
+function isSolved([, rooms]: State) {
   return rooms.every((r, i) => {
     return r.spaces.every((s) => s === "ABCD"[i]);
   });
@@ -157,12 +161,10 @@ function isSolved([hall, rooms]: State) {
 const mobEnergy = (mob: string): number => Math.pow(10, "ABCD".indexOf(mob));
 
 function energyCost([from, to]: Move, state: State) {
-  if (from.kind === "room") {
-    const mob = state[1][from.index].spaces[from.space];
-    return mobEnergy(mob!) * dist(from, to as HallPos);
-  }
-  const mob = state[0][from.slot];
-  return mobEnergy(mob!) * dist(to as RoomPos, from);
+  const mob = getPos(from, state)!;
+  const distance =
+    from.kind === "room" ? dist(from, to) : dist(to as RoomPos, from);
+  return mobEnergy(mob!) * distance;
 }
 function dist(from: RoomPos, to: HallPos | RoomPos) {
   let distOutOfRoom = from.space + 1;
@@ -201,7 +203,6 @@ let bestSolution = Infinity;
 function solve(state: State, energy: number): number {
   if (energy >= bestSolution) return Infinity;
   if (isSolved(state)) {
-    console.log(`Found solution ${energy}`);
     bestSolution = energy;
     return energy;
   }
@@ -221,24 +222,16 @@ const isSensibleMove = (state: State, [from, to]: Move) => {
   if (to.kind === "room") return true; // Always sensible to move into a room
   const mob = getPos(from, state)!;
   const goalRoom = state[1]["ABCD".indexOf(mob)];
-  let isBlocking = (otherMob: Mob | null) => {
-    if (!otherMob || mob === otherMob) return false;
-    let otherGoal = slotForRoomIdx("ABCD".indexOf(otherMob));
-    if (between(to.slot, [goalRoom.slot, otherGoal])) return true;
-  };
-  for (let s = 0; s < roomSize; s++) {
-    if (isBlocking(goalRoom.spaces[s])) return false;
-  }
   for (let h = goalRoom.slot; h !== to.slot; h += Math.sign(to.slot - h)) {
-    if (isBlocking(state[0][h])) return false;
+    const otherMob = state[0][h];
+    if (!otherMob || mob === otherMob) continue;
+    let otherGoal = slotForRoomIdx("ABCD".indexOf(otherMob));
+    if (between(to.slot, [goalRoom.slot, otherGoal])) return false;
   }
   return true;
 };
+console.log(solve(parseData(data), 0));
 
-const state = [hallways, rooms] as const;
-// console.log(legalMoves({ kind: "room", index: 0, space: 0 }, state));
-// console.log(
-//   dist({ kind: "room", index: 0, space: 0 }, { kind: "hall", slot: 0 })
-// );
-
-console.log(solve(state, 0));
+bestSolution = Infinity;
+data.splice(3, 0, "  #D#C#B#A#", "  #D#B#A#C#");
+console.log(solve(parseData(data), 0));
