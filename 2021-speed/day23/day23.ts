@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as nodePath from "path";
 import * as _ from "lodash";
 
-/*
+//*
 const path = "input.txt";
 /*/
 const path = "example.txt";
@@ -39,6 +39,24 @@ type RoomPos = { kind: "room"; index: number; space: number };
 type Pos = RoomPos | HallPos;
 
 type State = readonly [Hallway, Room[]];
+
+const show = (state: State) => {
+  let lines = ["#############"];
+  lines.push(`#${state[0].map((m) => m ?? ".").join("")}#`);
+  for (let i = 0; i < roomSize; i++) {
+    let roomValues = [];
+    for (let ri = 0; ri < 4; ri++) {
+      roomValues.push(state[1][ri].spaces[i] ?? ".");
+    }
+    lines.push(
+      i === 0
+        ? `###${roomValues.join("#")}###`
+        : `  #${roomValues.join("#")}#  `
+    );
+  }
+  lines.push("  #########  ");
+  console.log(lines.join("\n"));
+};
 
 const hallSpaces = new Set([0, 1, 3, 5, 7, 9, 10]);
 const slotForRoomIdx = (i: number) => i * 2 + 2;
