@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as nodePath from "path";
 import * as _ from "lodash";
 
-//*
+/*
 const path = "input.txt";
 /*/
 const path = "example.txt";
@@ -13,13 +13,15 @@ let data = fs
   .trim()
   .split("\n");
 
+let roomSize = 2;
+
 const hallways: Hallway = Array.from({ length: 11 }).map((x, i) => {
   const mob = data[1][i + 1];
   return mob === "." ? null : (mob as Mob);
 });
 const rooms: Room[] = [2, 4, 6, 8].map((slot) => ({
   slot,
-  spaces: [0, 1].map((space) => {
+  spaces: _.range(roomSize).map((space) => {
     const mob = data[2 + space][slot + 1];
     return mob === "." ? null : (mob as Mob);
   }),
@@ -32,21 +34,6 @@ type Room = {
 };
 type Hallway = Array<Mob | null>;
 
-const buildRooms = (mobs: Room["spaces"][]) => {
-  let slot = 0;
-  return mobs.map<Room>((m) => {
-    slot += 2;
-    return { slot, spaces: m };
-  });
-};
-
-// const rooms: Room[] = buildRooms([
-//   ["B", "A"],
-//   ["C", "D"],
-//   ["B", "C"],
-//   ["D", "A"],
-// ]);
-
 type HallPos = { kind: "hall"; slot: number };
 type RoomPos = { kind: "room"; index: number; space: number };
 type Pos = RoomPos | HallPos;
@@ -56,6 +43,13 @@ type State = readonly [Hallway, Room[]];
 const hallSpaces = new Set([0, 1, 3, 5, 7, 9, 10]);
 const slotForRoomIdx = (i: number) => i * 2 + 2;
 
+const backMostOpenSpace = (room: Room) => {
+  for (let s = roomSize - 1; s >= 0; s--) {
+    if (!room.spaces[s]) return s;
+  }
+  return undefined;
+};
+
 function legalMoves(pos: Pos, [hall, rooms]: State): Pos[] {
   if (pos.kind == "room") {
     let legalMoves: Pos[] = [];
@@ -64,11 +58,11 @@ function legalMoves(pos: Pos, [hall, rooms]: State): Pos[] {
     // if (!mob || "ABCD".indexOf(mob) === pos.index) return [];
     if (!mob) return [];
     let goalRoomIdx = "ABCD".indexOf(mob);
+    const goalRoom = rooms[goalRoomIdx];
     if (goalRoomIdx === pos.index) {
       if (pos.space === 1) return [];
       if (spaces[1] === mob) return [];
     }
-    const goalRoom = rooms[goalRoomIdx];
     const goalRoomValid = goalRoom.spaces.every((m) => !m || m === mob);
     let i = pos.space - 1;
     // can exit
@@ -81,7 +75,7 @@ function legalMoves(pos: Pos, [hall, rooms]: State): Pos[] {
       if (hall[h]) break;
       if (hallSpaces.has(h)) legalMoves.push({ kind: "hall", slot: h });
       if (h === goalRoom.slot && goalRoomValid) {
-        let destSpace = goalRoom.spaces[1] ? 0 : 1;
+        let destSpace = backMostOpenSpace(goalRoom)!;
         return [{ kind: "room", index: goalRoomIdx, space: destSpace }];
       }
     }
@@ -89,7 +83,7 @@ function legalMoves(pos: Pos, [hall, rooms]: State): Pos[] {
       if (hall[h]) break;
       if (hallSpaces.has(h)) legalMoves.push({ kind: "hall", slot: h });
       if (h === goalRoom.slot && goalRoomValid) {
-        let destSpace = goalRoom.spaces[1] ? 0 : 1;
+        let destSpace = backMostOpenSpace(goalRoom)!;
         return [{ kind: "room", index: goalRoomIdx, space: destSpace }];
       }
     }
@@ -110,7 +104,7 @@ function legalMoves(pos: Pos, [hall, rooms]: State): Pos[] {
   if (goalRoom.spaces.find((other) => other && other !== mob)) {
     return [];
   }
-  let destSpace = goalRoom.spaces[1] ? 0 : 1;
+  let destSpace = backMostOpenSpace(goalRoom)!;
   return [{ kind: "room", index: "ABCD".indexOf(mob), space: destSpace }];
 }
 
@@ -124,7 +118,7 @@ function* allLegalMoves(state: State): Generator<Move> {
   }
 
   for (let i = 0; i < 4; i++) {
-    for (const space of [0, 1]) {
+    for (const space of _.range(roomSize)) {
       let currentPos: Pos = { kind: "room", index: i, space };
       for (const move of legalMoves(currentPos, state)) {
         yield [currentPos, move];
