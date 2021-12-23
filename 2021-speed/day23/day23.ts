@@ -200,12 +200,35 @@ function solve(state: State, energy: number): number {
     bestSolution = energy;
     return energy;
   }
-  const solutions = Array.from(allLegalMoves(state)).map((move) =>
-    solve(makeMove(state, move), energy + energyCost(move, state))
-  );
+  const solutions = Array.from(allLegalMoves(state))
+    .filter((move) => isSensibleMove(state, move))
+    .map((move) =>
+      solve(makeMove(state, move), energy + energyCost(move, state))
+    );
   if (solutions.length === 0) return Infinity;
   return Math.min(...solutions);
 }
+
+const between = (a: number, [b, c]: [number, number]) =>
+  Math.sign(c - a) !== Math.sign(b - a);
+
+const isSensibleMove = (state: State, [from, to]: Move) => {
+  if (to.kind === "room") return true; // Always sensible to move into a room
+  const mob = getPos(from, state)!;
+  const goalRoom = state[1]["ABCD".indexOf(mob)];
+  let isBlocking = (otherMob: Mob | null) => {
+    if (!otherMob || mob === otherMob) return false;
+    let otherGoal = slotForRoomIdx("ABCD".indexOf(otherMob));
+    if (between(to.slot, [goalRoom.slot, otherGoal])) return true;
+  };
+  for (let s = 0; s < roomSize; s++) {
+    if (isBlocking(goalRoom.spaces[s])) return false;
+  }
+  for (let h = goalRoom.slot; h !== to.slot; h += Math.sign(to.slot - h)) {
+    if (isBlocking(state[0][h])) return false;
+  }
+  return true;
+};
 
 const state = [hallways, rooms] as const;
 // console.log(legalMoves({ kind: "room", index: 0, space: 0 }, state));
@@ -213,5 +236,4 @@ const state = [hallways, rooms] as const;
 //   dist({ kind: "room", index: 0, space: 0 }, { kind: "hall", slot: 0 })
 // );
 
-console.log(Array.from(allLegalMoves(state)));
 console.log(solve(state, 0));
