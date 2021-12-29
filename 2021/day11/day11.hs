@@ -1,5 +1,4 @@
-import Control.Monad.ST (runST)
-import Control.Monad.State
+import Control.Monad.Writer
 import Data.Bifunctor (Bifunctor (bimap))
 import Data.Char (digitToInt)
 
@@ -7,13 +6,12 @@ main = do
   input <-
     getContents
   let stuff = map (map digitToInt) $ lines input
-  let states = iterate (>>= doRound) $ return stuff
   print $ part1 stuff
   print $ part2 stuff
 
 part1 :: [[Int]] -> Int
 part1 initState =
-  execState (states !! 100) 0
+  getSum $ execWriter (states !! 100)
   where
     states = iterate (>>= doRound) $ return initState
 
@@ -21,23 +19,24 @@ part2 :: [[Int]] -> Int
 part2 initState =
   statesUntilAllZero initState (allZeros initState) 0
 
+evalWriter = fst . runWriter
+
 statesUntilAllZero state allZeros count =
   if state == allZeros
     then count
-    else statesUntilAllZero (evalState (doRound state) 0) allZeros count + 1
+    else statesUntilAllZero (evalWriter (doRound state)) allZeros count + 1
 
 allZeros = map $ map $ const 0
 
-doRound :: [[Int]] -> State Int [[Int]]
+doRound :: [[Int]] -> Writer (Sum Int) [[Int]]
 doRound grid = do
   let newGrid = step grid
   let toFlash = filter ((== 10) . valueAt newGrid) $ gridCoords newGrid
   countFlashes $ length toFlash
   fmap resetFlashed (flash (newGrid, toFlash))
 
-countFlashes f = do
-  count <- get
-  put (count + f)
+countFlashes :: Int -> Writer (Sum Int) ()
+countFlashes f = tell $ Sum f
 
 resetFlashed :: [[Int]] -> [[Int]]
 resetFlashed = map $ map (\val -> if val > 9 then 0 else val)
@@ -45,12 +44,9 @@ resetFlashed = map $ map (\val -> if val > 9 then 0 else val)
 step :: [[Int]] -> [[Int]]
 step = map (map (+ 1))
 
-flash :: ([[Int]], [(Int, Int)]) -> State Int [[Int]]
+flash :: ([[Int]], [(Int, Int)]) -> Writer (Sum Int) [[Int]]
 flash (grid, []) = return grid
-flash (grid, coord : restToFlash) =
-  do
-    countFlashes $ length newToFlash
-    flash (newGrid, newToFlash ++ restToFlash)
+flash (grid, coord : restToFlash) = countFlashes (length newToFlash) >> flash (newGrid, newToFlash ++ restToFlash)
   where
     toUpdate = neighbors grid coord
     newToFlash = filter ((== 9) . valueAt grid) toUpdate
