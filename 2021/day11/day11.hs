@@ -6,27 +6,19 @@ main = do
   input <-
     getContents
   let stuff = map (map digitToInt) $ lines input
-  print $ part1 stuff
-  print $ part2 stuff
+  let states = iterate (>>= doRound) $ return stuff
+  print $ part1 states
 
-part1 :: [[Int]] -> Int
-part1 initState =
+  let allZeros = (map $ map $ const 0) stuff
+  print $ part2 allZeros states
+
+part1 :: [Writer (Sum Int) [[Int]]] -> Int
+part1 states =
   getSum $ execWriter (states !! 100)
-  where
-    states = iterate (>>= doRound) $ return initState
 
-part2 :: [[Int]] -> Int
-part2 initState =
-  statesUntilAllZero initState (allZeros initState) 0
+part2 zerosGrid = length . takeWhile ((zerosGrid /=) . evalWriter)
 
 evalWriter = fst . runWriter
-
-statesUntilAllZero state allZeros count =
-  if state == allZeros
-    then count
-    else statesUntilAllZero (evalWriter (doRound state)) allZeros count + 1
-
-allZeros = map $ map $ const 0
 
 doRound :: [[Int]] -> Writer (Sum Int) [[Int]]
 doRound grid = do
