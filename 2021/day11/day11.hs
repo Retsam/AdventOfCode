@@ -8,11 +8,22 @@ main = do
     getContents
   let stuff = map (map digitToInt) $ lines input
   let states = iterate (>>= doRound) $ return stuff
+  let zeroesGrid = allZeros stuff
   print $ part1 states
+  -- takeWhile ((/= allZeros) . (`evalState` 0)) states
+  -- print $ (map ((/= zeroesGrid) . (`evalState` 0)) states) !! 194
+
+  print $ part2 states $ allZeros stuff
 
 part1 :: [State Int a] -> Int
 part1 states =
   execState (states !! 100) 0
+
+part2 :: [State Int [[Int]]] -> [[Int]] -> Int
+part2 states allZeros =
+  length $ takeWhile ((/= allZeros) . (`evalState` 0)) states
+
+allZeros = map $ map $ const 0
 
 doRound :: [[Int]] -> State Int [[Int]]
 doRound grid = do
