@@ -12,11 +12,10 @@ main = do
   print $ part1 paths
   print $ part2 paths
 
-pathAndReverse ("start", b) = [("start", b)]
-pathAndReverse (b, "start") = [("start", b)]
-pathAndReverse (a, "end") = [(a, "end")]
-pathAndReverse ("end", a) = [(a, "end")]
-pathAndReverse (a, b) = [(a, b), (b, a)]
+pathAndReverse (a, b)
+  | a == "start" || b == "end" = [(a, b)]
+  | a == "end" || b == "start" = [(b, a)]
+  | otherwise = [(a, b), (b, a)]
 
 part1 paths = length $ findPath paths part1CanVisit [] "start"
 
