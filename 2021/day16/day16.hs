@@ -1,6 +1,4 @@
-import Control.Monad
 import Data.Char (digitToInt)
-import Data.Functor ((<&>))
 import Data.List (foldl')
 import Numeric (readHex)
 import Text.Parsec
@@ -19,11 +17,14 @@ data Payload
   | Op Int [Packet]
   deriving (Show)
 
+part1 :: Packet -> Int
 part1 (v, Value _) = v
 part1 (v, Op _ packets) = v + sum (map part1 packets)
 
+eval :: Packet -> Int
 eval (_, v) = eval' v
 
+eval' :: Payload -> Int
 eval' (Value v) = v
 eval' (Op 0 pkts) = sum $ map eval pkts
 eval' (Op 1 pkts) = product $ map eval pkts
@@ -38,18 +39,17 @@ parsePacket :: Parsec String () Packet
 parsePacket = (,) <$> binaryNumber 3 <*> parsePayload
 
 parsePayload :: Parsec String () Payload
-parsePayload = do
-  kind <- binaryNumber 3
-  if kind == 4 then Value <$> parseValue else parseOperator kind
+parsePayload = binaryNumber 3 >>= fromKind
+  where
+    fromKind 4 = Value <$> parseValue
+    fromKind kind = parseOperator kind
 
-parseOperator x = do
-  lengthType <- binDigit
-  let subPackets =
-        if lengthType == '1'
-          then binaryNumber 11 >>= (`count` parsePacket)
-          else binaryNumber 15 >>= subpacketsByLength
+parseOperator :: Int -> Parsec String () Payload
+parseOperator id = Op id <$> (binDigit >>= subpackets)
 
-  Op x <$> subPackets
+subpackets '0' = binaryNumber 15 >>= subpacketsByLength
+subpackets '1' = binaryNumber 11 >>= (`count` parsePacket)
+subpackets _ = error "oops"
 
 sourcePos :: Parsec s () SourcePos
 sourcePos = statePos `fmap` getParserState
@@ -59,17 +59,17 @@ subpacketsByLength n = do
   pos <- sourceColumn <$> sourcePos
   p <- parsePacket
   pos2 <- sourceColumn <$> sourcePos
-  let r = n - (pos2 - pos)
-  if r > 0 then subpacketsByLength r <&> ([p] ++) else return [p]
+  let bytesLeft = n - (pos2 - pos)
+  if bytesLeft > 0 then ([p] ++) <$> subpacketsByLength bytesLeft else return [p]
 
+parseValue :: Parsec String () Int
 parseValue = toDec <$> parseValue'
 
 parseValue' :: Parsec String () [Char]
 parseValue' = do
   prefix <- binDigit
   seg <- count 4 binDigit
-  -- parseValue' >>= (return . (seg ++))
-  if prefix == '0' then return seg else parseValue' <&> (seg ++)
+  if prefix == '0' then return seg else (seg ++) <$> parseValue'
 
 binDigit :: Parsec String () Char
 binDigit = oneOf "01"
@@ -79,6 +79,7 @@ binaryNumber n = toDec <$> count n binDigit
 toDec :: String -> Int
 toDec = foldl' (\acc x -> acc * 2 + digitToInt x) 0
 
+hexToBin :: String -> String
 hexToBin c = c >>= fromHexDigit
 
 fromHexDigit :: Char -> String
