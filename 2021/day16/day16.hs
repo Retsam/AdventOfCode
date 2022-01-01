@@ -10,6 +10,7 @@ main = do
   input <- hexToBin <$> getContents
   let parsed = parse parsePacket "input" input
   print $ part1 <$> parsed
+  print $ eval <$> parsed
 
 type Packet = (Int, Payload)
 
@@ -20,6 +21,18 @@ data Payload
 
 part1 (v, Value _) = v
 part1 (v, Op _ packets) = v + sum (map part1 packets)
+
+eval (_, v) = eval' v
+
+eval' (Value v) = v
+eval' (Op 0 pkts) = sum $ map eval pkts
+eval' (Op 1 pkts) = product $ map eval pkts
+eval' (Op 2 pkts) = minimum $ map eval pkts
+eval' (Op 3 pkts) = maximum $ map eval pkts
+eval' (Op 5 [a, b]) = if eval a > eval b then 1 else 0
+eval' (Op 6 [a, b]) = if eval a < eval b then 1 else 0
+eval' (Op 7 [a, b]) = if eval a == eval b then 1 else 0
+eval' _ = error "bad packet"
 
 parsePacket :: Parsec String () Packet
 parsePacket = (,) <$> binaryNumber 3 <*> parsePayload
