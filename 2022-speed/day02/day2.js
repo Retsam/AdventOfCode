@@ -1,6 +1,12 @@
 const fs = require("fs");
+const osPath = require("path");
+
 const path = "input.txt";
-const input = fs.readFileSync(path).toString().trim().split("\n");
+const input = fs
+  .readFileSync(osPath.join(__dirname, path))
+  .toString()
+  .trim()
+  .split("\n");
 
 // There are some really clever solutions to this problem involving modulo lookups to determine win and loss.
 //    ... this isn't one of them.
