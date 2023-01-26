@@ -1,10 +1,13 @@
 use std::io::{self, Read};
 
-fn parse_input() -> io::Result<Vec<(String, String)>> {
+fn read_input() -> io::Result<String> {
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
+    Ok(buffer)
+}
 
-    let r = buffer
+fn parse_part1(buffer: String) -> Vec<(String, String)> {
+    buffer
         .lines()
         .map(|l| {
             let half = l.len() / 2;
@@ -13,8 +16,7 @@ fn parse_input() -> io::Result<Vec<(String, String)>> {
                 l.chars().skip(half).collect(),
             )
         })
-        .collect::<Vec<(String, String)>>();
-    Ok(r)
+        .collect::<Vec<(String, String)>>()
 }
 
 fn get_val(c: char) -> i32 {
@@ -26,13 +28,25 @@ fn get_val(c: char) -> i32 {
 }
 
 fn main() -> io::Result<()> {
-    let mut sum = 0;
-    for (a, b) in parse_input()? {
+    let input = read_input()?;
+    let mut p1 = 0;
+    for (a, b) in parse_part1(input.clone()) {
         let shared = a.chars().find(|c| b.contains(*c)).expect("No common char");
-        sum += get_val(shared);
+        p1 += get_val(shared);
     }
 
-    println!("{}", sum);
+    let mut p2 = 0;
+    let mut lines = input.lines();
+    while let Some(a) = lines.next() {
+        let (b, c) = (lines.next().unwrap(), lines.next().unwrap());
+        let shared = a
+            .chars()
+            .find(|ch| b.contains(*ch) && c.contains(*ch))
+            .expect("No common char");
+        p2 += get_val(shared);
+    }
+
+    println!("Part 1: {}\nPart 2: {}", p1, p2);
 
     Ok(())
 }
