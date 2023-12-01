@@ -23,15 +23,13 @@ fn parse_line(is_part_two: bool, line: &str) -> u32 {
         .enumerate()
         // flat_map skips None values
         .flat_map(|(i, c)| {
-            c.to_string().parse::<u32>().ok().or_else(|| {
+            c.to_digit(10).or_else(|| {
                 if !is_part_two {
                     return None;
                 }
                 DIGITS
                     .iter()
-                    .position(|digit| {
-                        line.chars().skip(i).take(digit.len()).collect::<String>() == **digit
-                    })
+                    .position(|digit| line.chars().skip(i).take(digit.len()).eq(digit.chars()))
                     // Digit value is index plus one, since there's no zero
                     .map(|index| (index + 1) as u32)
             })
