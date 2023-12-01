@@ -4,13 +4,15 @@ fn main() -> io::Result<()> {
     let mut buf = String::new();
     io::stdin().read_to_string(&mut buf)?;
 
-    let part1: u32 = buf.lines().map(|line| parse_line(false, line)).sum();
-    println!("Part 1: {}", part1);
+    println!("Part 1: {}", solve(false, &buf));
 
-    let part2: u32 = buf.lines().map(|line| parse_line(true, line)).sum();
-    println!("Part 2: {}", part2);
+    println!("Part 2: {}", solve(true, &buf));
 
     Ok(())
+}
+
+fn solve(is_part_two: bool, buf: &str) -> u32 {
+    buf.lines().map(|line| parse_line(is_part_two, line)).sum()
 }
 
 const DIGITS: [&str; 9] = [
