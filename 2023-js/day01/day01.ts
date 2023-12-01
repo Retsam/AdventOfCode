@@ -23,7 +23,7 @@ function solve(isPartTwo: boolean) {
         })
         .filter((x) => x);
 
-      return parseInt(`${digits[0]}${digits.at(-1)}`);
+      return 10 * digits[0]! + digits.at(-1)!;
     })
     .reduce((a, b) => a + b);
 }
