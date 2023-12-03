@@ -1,4 +1,6 @@
+use itertools::Itertools;
 use std::io::{self, Read};
+use std::str::FromStr;
 
 struct ValuesByColor {
     red: u32,
@@ -15,7 +17,10 @@ fn main() -> io::Result<()> {
     let mut buf = String::new();
     io::stdin().read_to_string(&mut buf)?;
 
-    let games: Vec<_> = buf.lines().map(parse_game).collect();
+    let games: Vec<Game> = buf
+        .lines()
+        .map(|l| l.parse().expect("Failed to parse"))
+        .collect();
 
     let part1_maxes = ValuesByColor {
         red: 12,
@@ -43,44 +48,36 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn split_at_match<'a>(input: &'a str, pattern: &str) -> (&'a str, &'a str) {
-    let (idx, _) = input
-        .match_indices(pattern)
-        .next()
-        .unwrap_or_else(|| panic!("Failed to match pattern {}", pattern));
-    let (a, b) = input.split_at(idx);
-    (a, &b[pattern.len()..])
-}
+impl FromStr for Game {
+    type Err = Box<dyn std::error::Error>;
 
-fn parse_game(input: &str) -> Game {
-    let (game_id_str, rounds) = split_at_match(input, ": ");
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (id_str, rounds) = s.splitn(2, ": ").collect_tuple().unwrap();
+        let id = id_str
+            .trim_start_matches("Game ")
+            .parse::<u32>()
+            .expect("game id to be valid");
 
-    let id = game_id_str
-        .chars()
-        .skip("Game ".len())
-        .collect::<String>()
-        .parse::<u32>()
-        .expect("game id to be valid");
+        let maxes = rounds.split("; ").flat_map(|round| round.split(", ")).fold(
+            ValuesByColor {
+                red: 0,
+                blue: 0,
+                green: 0,
+            },
+            |mut acc, draw| {
+                let (num, color) = draw.splitn(2, ' ').collect_tuple().unwrap();
+                let num = num.parse::<u32>().expect("Invalid draw count");
 
-    let maxes = rounds.split("; ").flat_map(|round| round.split(", ")).fold(
-        ValuesByColor {
-            red: 0,
-            blue: 0,
-            green: 0,
-        },
-        |mut acc, draw| {
-            let (num_str, color) = split_at_match(draw, " ");
-            let num = num_str.parse::<u32>().expect("Invalid draw count");
+                match color {
+                    "red" => acc.red = num.max(acc.red),
+                    "blue" => acc.blue = num.max(acc.blue),
+                    "green" => acc.green = num.max(acc.green),
+                    _ => panic!("Invalid color"),
+                };
+                acc
+            },
+        );
 
-            match color {
-                "red" => acc.red = num.max(acc.red),
-                "blue" => acc.blue = num.max(acc.blue),
-                "green" => acc.green = num.max(acc.green),
-                _ => panic!("Invalid color"),
-            };
-            acc
-        },
-    );
-
-    Game { id, maxes }
+        Ok(Game { id, maxes })
+    }
 }
