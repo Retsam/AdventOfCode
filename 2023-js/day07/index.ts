@@ -11,15 +11,15 @@ const data = lines.map((x) => {
 });
 
 const handType = (hand: string[], includeJokers: boolean): number => {
-  const groups: string[][] = _.values(
-    _.groupBy(hand.filter((c) => !(includeJokers && c === "J")))
+  const counts = Object.values(
+    _.countBy(hand.filter((c) => !(includeJokers && c === "J")))
   );
   const jokerCount = includeJokers ? hand.filter((c) => c === "J").length : 0;
 
-  const fiveKind = groups.find(_.matches({ length: 5 }));
-  const fourKind = groups.find(_.matches({ length: 4 }));
-  const threeKind = groups.find(_.matches({ length: 3 }));
-  const pairCount = groups.filter(_.matches({ length: 2 })).length;
+  const fiveKind = counts.includes(5);
+  const fourKind = counts.includes(4);
+  const threeKind = counts.includes(3);
+  const pairCount = counts.filter((c) => c === 2).length;
 
   if (
     fiveKind ||
