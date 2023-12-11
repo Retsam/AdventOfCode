@@ -51,6 +51,38 @@ fn main() -> Result<(), String> {
     Ok(())
 }
 
+fn part1(seeds: &[u64], mappings: &[Mapping]) -> u64 {
+    seeds
+        .iter()
+        .map(|start| mappings.iter().fold(*start, translate))
+        .min()
+        .unwrap()
+}
+
+fn part2(ranges: Vec<Range<u64>>, mappings: Vec<Mapping>) -> u64 {
+    mappings
+        .into_iter()
+        .fold(ranges, |ranges, map| {
+            ranges
+                .into_iter()
+                // Split a range wherever it crosses a mapping boundary
+                // e.g. `0..10` with a mapping from 3..5 will become [0..3, 3..5, 5..10]
+                .flat_map(|range| split_range_on_breakpoints(range, &map))
+                .map(|range| {
+                    let new_start = translate(range.start, &map);
+                    // Since we've ensured the entire range is handled by one 'mapping',
+                    // the end is will follow after the start point
+                    let new_end = new_start + range.count() as u64;
+                    new_start..new_end
+                })
+                .collect_vec()
+        })
+        .iter()
+        .map(|range| range.start)
+        .min()
+        .unwrap()
+}
+
 fn translate(input: u64, mapping: &Mapping) -> u64 {
     mapping
         .iter()
@@ -64,15 +96,7 @@ fn translate(input: u64, mapping: &Mapping) -> u64 {
         .unwrap_or(input)
 }
 
-fn part1(seeds: &[u64], mappings: &[Mapping]) -> u64 {
-    seeds
-        .iter()
-        .map(|start| mappings.iter().fold(*start, translate))
-        .min()
-        .unwrap()
-}
-
-fn translate_range(range: Range<u64>, mapping: &Mapping) -> Vec<Range<u64>> {
+fn split_range_on_breakpoints(range: Range<u64>, mapping: &Mapping) -> Vec<Range<u64>> {
     // Find all the start and endpoints of the translations that break up `range`, duplicate them then chunk so we go:
     // [x1, x2] -> [x1, x1, x2, x2] -> [start, x1, x1, x2, x2, end] -> [start..x1, x1..x2, x2..end]
     let mut breakpoints = mapping
@@ -89,23 +113,4 @@ fn translate_range(range: Range<u64>, mapping: &Mapping) -> Vec<Range<u64>> {
         .tuples()
         .map(|(x, y)| x..y)
         .collect()
-}
-
-fn part2(ranges: Vec<Range<u64>>, mappings: Vec<Mapping>) -> u64 {
-    mappings
-        .into_iter()
-        .fold(ranges, |ranges, map| {
-            ranges
-                .into_iter()
-                .flat_map(|range| translate_range(range, &map))
-                .map(|range| {
-                    let new_start = translate(range.start, &map);
-                    new_start..(new_start + range.count() as u64)
-                })
-                .collect_vec()
-        })
-        .iter()
-        .map(|range| range.start)
-        .min()
-        .unwrap()
 }
