@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::io::{self, Read};
 use std::ops::Range;
 
-type Mapping = Vec<(Range<u64>, Range<u64>)>;
+type Mapping = Vec<(Range<usize>, Range<usize>)>;
 
 fn main() -> Result<(), String> {
     let mut buf = String::new();
@@ -17,7 +17,7 @@ fn main() -> Result<(), String> {
         .unwrap()
         .trim_start_matches("seeds: ")
         .split(' ')
-        .map(|x| x.parse::<u64>().unwrap())
+        .map(|x| x.parse::<usize>().unwrap())
         .collect();
 
     let maps = groups
@@ -28,7 +28,7 @@ fn main() -> Result<(), String> {
                 .map(|str| {
                     let (dest, src, len) = str
                         .splitn(3, ' ')
-                        .map(|x| x.parse::<u64>().unwrap())
+                        .map(|x| x.parse::<usize>().unwrap())
                         .collect_tuple()
                         .unwrap();
                     (src..src + len, dest..dest + len)
@@ -51,7 +51,7 @@ fn main() -> Result<(), String> {
     Ok(())
 }
 
-fn part1(seeds: &[u64], mappings: &[Mapping]) -> u64 {
+fn part1(seeds: &[usize], mappings: &[Mapping]) -> usize {
     seeds
         .iter()
         .map(|start| mappings.iter().fold(*start, translate))
@@ -59,7 +59,7 @@ fn part1(seeds: &[u64], mappings: &[Mapping]) -> u64 {
         .unwrap()
 }
 
-fn part2(ranges: Vec<Range<u64>>, mappings: Vec<Mapping>) -> u64 {
+fn part2(ranges: Vec<Range<usize>>, mappings: Vec<Mapping>) -> usize {
     mappings
         .into_iter()
         .fold(ranges, |ranges, map| {
@@ -72,7 +72,8 @@ fn part2(ranges: Vec<Range<u64>>, mappings: Vec<Mapping>) -> u64 {
                     let new_start = translate(range.start, &map);
                     // Since we've ensured the entire range is handled by one 'mapping',
                     // the end is will follow after the start point
-                    let new_end = new_start + range.count() as u64;
+                    //   FUN FACT: originally I used Range<u64> and range.count() here, and that made this program 2000x times slower, when not optimized
+                    let new_end = new_start + range.len();
                     new_start..new_end
                 })
                 .collect_vec()
@@ -83,7 +84,7 @@ fn part2(ranges: Vec<Range<u64>>, mappings: Vec<Mapping>) -> u64 {
         .unwrap()
 }
 
-fn translate(input: u64, mapping: &Mapping) -> u64 {
+fn translate(input: usize, mapping: &Mapping) -> usize {
     mapping
         .iter()
         .find_map(|(src_range, dest_range)| {
@@ -96,7 +97,7 @@ fn translate(input: u64, mapping: &Mapping) -> u64 {
         .unwrap_or(input)
 }
 
-fn split_range_on_breakpoints(range: Range<u64>, mapping: &Mapping) -> Vec<Range<u64>> {
+fn split_range_on_breakpoints(range: Range<usize>, mapping: &Mapping) -> Vec<Range<usize>> {
     // Find all the start and endpoints of the translations that break up `range`, duplicate them then chunk so we go:
     // [x1, x2] -> [x1, x1, x2, x2] -> [start, x1, x1, x2, x2, end] -> [start..x1, x1..x2, x2..end]
     let mut breakpoints = mapping
