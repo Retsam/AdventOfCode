@@ -1,9 +1,10 @@
 import fs from "fs";
+import { move } from "../coordlib/coord.js";
+import { Dir } from "../coordlib/dir.js";
 
 const range = (start: number, end: number) =>
   Array.from({ length: end - start }, (_, i) => i + start);
 
-// const input = fs.readFileSync("example.txt").toString().trim();
 const input = fs.readFileSync("input.txt").toString().trim();
 
 const data = input.split("\n").map((l) => l.split(""));
@@ -12,31 +13,20 @@ const maxY = data.length;
 
 type Coord = [number, number];
 
-type Dir = "l" | "r" | "u" | "d";
 type Beam = [Coord, Dir];
-const offsets: Record<Dir, Coord> = {
-  u: [0, -1],
-  r: [1, 0],
-  d: [0, 1],
-  l: [-1, 0],
-};
-const moveCoords = ([x, y]: Coord, dir: Dir): Coord => {
-  const [dx, dy] = offsets[dir];
-  return [x + dx, y + dy];
-};
 
-const flipForward = {
+const flipForward: Record<Dir, Dir> = {
   r: "u",
   u: "r",
   l: "d",
   d: "l",
-} as const;
-const flipBack = {
+};
+const flipBack: Record<Dir, Dir> = {
   r: "d",
   d: "r",
   l: "u",
   u: "l",
-} as const;
+};
 
 const getAt = ([x, y]: Coord) => data[y]?.[x];
 
@@ -51,7 +41,7 @@ function solve(init: Beam) {
     const stateStr = [coord, dir].toString();
     if (beamSet.has(stateStr)) continue;
     beamSet.add(stateStr);
-    const c2 = moveCoords(coord, dir);
+    const c2 = move(coord, dir);
     const tile = getAt(c2);
     if (tile === undefined) continue;
     if (

@@ -1,10 +1,18 @@
 import fs from "fs";
-import chalk from "../node_modules/chalk/source/index";
+import chalk from "chalk";
+
+import {
+  Dir,
+  reverse,
+  all as allDirs,
+  turnLeft,
+  turnRight,
+} from "../coordlib/dir.js";
+import { offsets, move } from "../coordlib/coord.js";
 
 type Tile = "." | "S" | "F" | "7" | "L" | "J" | "|" | "-";
 
-const allDirs = ["u", "d", "l", "r"] as const;
-type Dir = (typeof allDirs)[number];
+// Not using the library's branded version
 type Coord = [number, number];
 
 // prettier-ignore
@@ -17,20 +25,6 @@ const connectionsForTile: Record<Tile, Dir[]> = {
   "J": ["u", "l"],
   "L": ["u", "r"],
   ".": []
-};
-const offsets: Record<Dir, Coord> = {
-  u: [0, -1],
-  r: [1, 0],
-  d: [0, 1],
-  l: [-1, 0],
-};
-const reverse: Record<Dir, Dir> = { u: "d", d: "u", l: "r", r: "l" };
-const turnLeft: Record<Dir, Dir> = { l: "d", d: "r", r: "u", u: "l" };
-const turnRight: Record<Dir, Dir> = { l: "u", d: "l", r: "d", u: "r" };
-
-const moveCoords = ([x, y]: Coord, dir: Dir): Coord => {
-  const [dx, dy] = offsets[dir];
-  return [x + dx, y + dy];
 };
 
 const input = fs.readFileSync(process.stdin.fd).toString().trim();
@@ -55,7 +49,7 @@ do {
     if (pipe === "." || pipe === "S") continue;
 
     const connections = connectionsForTile[pipe].filter((d) =>
-      connectionsForTile[getAt(moveCoords(coords, d))].includes(reverse[d])
+      connectionsForTile[getAt(move(coords, d))].includes(reverse[d])
     );
     if (connections.length !== 2) {
       setAt(coords, ".");
@@ -71,17 +65,15 @@ const mainLoopSet = new Set<string>([startCoords.toString()]);
 // pipes that connect back.
 const toCheck: Coord[] = allDirs
   .filter((d) =>
-    connectionsForTile[getAt(moveCoords(startCoords, d))].includes(reverse[d])
+    connectionsForTile[getAt(move(startCoords, d))].includes(reverse[d])
   )
-  .map((d) => moveCoords(startCoords, d));
+  .map((d) => move(startCoords, d));
 
 while (toCheck.length) {
   const coord = toCheck.shift()!;
   if (mainLoopSet.has(coord.toString())) continue;
   mainLoopSet.add(coord.toString());
-  toCheck.push(
-    ...connectionsForTile[getAt(coord)].map((d) => moveCoords(coord, d))
-  );
+  toCheck.push(...connectionsForTile[getAt(coord)].map((d) => move(coord, d)));
 }
 
 /*
@@ -97,22 +89,22 @@ const markSpaceIfEmpty = (p: Coord, set: Set<string>) => {
 let pos = startCoords;
 // Find a valid starting direction
 let heading = allDirs.find((d) =>
-  connectionsForTile[getAt(moveCoords(startCoords, d))].includes(reverse[d])
+  connectionsForTile[getAt(move(startCoords, d))].includes(reverse[d])
 )!;
 
 do {
   // Take a step, mark the left and right spots (if empty) into the appropriate sets)
-  pos = moveCoords(pos, heading);
-  markSpaceIfEmpty(moveCoords(pos, turnLeft[heading]), leftSet);
-  markSpaceIfEmpty(moveCoords(pos, turnRight[heading]), rightSet);
+  pos = move(pos, heading);
+  markSpaceIfEmpty(move(pos, turnLeft[heading]), leftSet);
+  markSpaceIfEmpty(move(pos, turnRight[heading]), rightSet);
   if (getAt(pos) !== "|" && getAt(pos) !== "-") {
     // Change our heading based on the new pipe, then check the left and right again
     //  (When we go around a corner, we may need to mark both spaces on the outside)
     heading = connectionsForTile[getAt(pos)].find(
       (d) => d !== reverse[heading]
     )!;
-    markSpaceIfEmpty(moveCoords(pos, turnLeft[heading]), leftSet);
-    markSpaceIfEmpty(moveCoords(pos, turnRight[heading]), rightSet);
+    markSpaceIfEmpty(move(pos, turnLeft[heading]), leftSet);
+    markSpaceIfEmpty(move(pos, turnRight[heading]), rightSet);
   }
 } while (pos.toString() !== startCoords.toString());
 
@@ -121,7 +113,7 @@ const [outsideSet, insideSet] =
 
 function flood(coord: Coord) {
   allDirs
-    .map((d) => moveCoords(coord, d))
+    .map((d) => move(coord, d))
     .forEach((coord) => {
       if (
         !insideSet.has(coord.toString()) &&
