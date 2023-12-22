@@ -48,3 +48,19 @@ export const move = ([x, y]: RawCoord, dir: Dir): Coord => {
 export const neighbors = ([x, y]: RawCoord) => {
   return Object.values(offsets).map(([dx, dy]) => xy(x + dx, y + dy));
 };
+
+export const mapFromInput = <Tile>(
+  input: string,
+  toTile: (char: string, coord: Coord) => Tile
+): Map<Coord, Tile> => {
+  const map = new Map<Coord, Tile>();
+
+  input.split("\n").forEach((line, y) =>
+    line.split("").forEach((char, x) => {
+      const coord = xy(x, y);
+      map.set(coord, toTile(char, coord));
+    })
+  );
+
+  return map;
+};
