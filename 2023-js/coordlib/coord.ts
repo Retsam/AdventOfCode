@@ -22,16 +22,20 @@ export const xy = (x: number, y: number): Coord => {
 export const getBounds = () => ({ minX, maxX, minY, maxY });
 
 export const render = (renderFunc: (coord: Coord) => string) => {
-  console.log(
-    range(minY, maxY + 1)
-      .map((y) =>
-        range(minX, maxX + 1)
-          .map((x) => renderFunc(xy(x, y)))
-          .join("")
-      )
-      .join("\n")
-  );
+  const res = range(minY, maxY + 1)
+    .map((y) =>
+      range(minX, maxX + 1)
+        .map((x) => renderFunc(xy(x, y)))
+        .join("")
+    )
+    .join("\n");
+  console.log(res);
 };
+
+export const renderFromMap = <T>(
+  map: Map<Coord, T>,
+  renderFunc: (tile: T | undefined, coord: Coord) => string
+) => render((coord) => renderFunc(map.get(coord), coord));
 
 export const offsets: Record<Dir, RawCoord> = {
   u: [0, -1],
