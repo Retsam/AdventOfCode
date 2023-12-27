@@ -17,12 +17,14 @@ const tilt = () => {
   for (let x = 0; x < maxX; x++) {
     for (let y = 1; y < maxY; y++) {
       const tile = data[y][x];
-      const above = data[y - 1][x];
-      if (tile === "O" && above === ".") {
+      if (tile !== "O") continue;
+      let target = y;
+      while (target > 0 && data[target - 1][x] === ".") {
+        target -= 1;
+      }
+      if (target !== y) {
+        data[target][x] = "O";
         data[y][x] = ".";
-        data[y - 1][x] = "O";
-        y -= 1;
-        x -= 1;
       }
     }
   }
