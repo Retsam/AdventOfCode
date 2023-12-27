@@ -48,14 +48,16 @@ fn parse_input(buf: &str) -> Option<(&str, &str)> {
 }
 
 fn parse_part1((time_line, distance_line): (&str, &str)) -> Option<Vec<Input>> {
-    time_line
-        .split_ascii_whitespace()
-        .map(|x| x.parse::<f64>().ok())
-        .zip(
-            distance_line
-                .split_ascii_whitespace()
-                .map(|x| x.parse::<f64>().ok()),
-        )
+    // Interesting rustism here: annotating `|x: &str|` causes a lifetime issue - so this is written
+    //  to infer x (hence `str::split_ascii_whitespace(x)` instead of `x.split_ascii_whitespace()`)
+    //  (Thanks Rust Discord)
+    // let parse_nums = |x| str::split_ascii_whitespace(x).map(|x| x.parse::<f64>().ok());
+    fn parse_nums(x: &str) -> impl '_ + Iterator<Item = Option<f64>> {
+        x.split_ascii_whitespace().map(|x| x.parse::<f64>().ok())
+    }
+
+    parse_nums(time_line)
+        .zip(parse_nums(distance_line))
         .map(|(x, y)| Some((x?, y?)))
         .collect()
 }
