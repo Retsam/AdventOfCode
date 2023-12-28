@@ -1,3 +1,6 @@
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
+use std::hash::Hasher;
 use std::ops::Range;
 use std::{
     collections::HashSet,
@@ -16,8 +19,31 @@ fn main() -> Result<(), String> {
     io::stdin()
         .read_to_string(&mut buf)
         .map_err(|_| "Failed to read input")?;
-    let (state, max) = parse_input(&buf);
-    println!("{}", sum(&tilt(state), max));
+    let (mut state, max) = parse_input(&buf);
+    {
+        let state = state.clone();
+        println!("{}", sum(&tilt(state), max));
+    }
+    let mut prev_states = HashMap::<u64, usize>::new();
+    // for _ in 0..1_000_000_000 {
+    let mut count = 0;
+    prev_states.insert(hash(&state.1, max), 0);
+    let cycle_start = loop {
+        state = cycle(state, max);
+        count += 1;
+        let state_hash = hash(&state.1, max);
+        let prev_entry = prev_states.get(&state_hash);
+        if let Some(prev) = prev_entry {
+            break prev;
+        }
+        prev_states.insert(state_hash, count);
+    };
+    let cycle_length = count - cycle_start;
+    let steps_to_take = (1_000_000_000 - cycle_start) % cycle_length;
+    for _ in 0..steps_to_take {
+        state = cycle(state, max)
+    }
+    println!("{}", sum(&state, max));
 
     Ok(())
 }
@@ -41,14 +67,32 @@ fn print_grid(x_range: Range<usize>, y_range: Range<usize>, render: impl Fn(Coor
     println!("{}", lines.collect::<Vec<_>>().join("\n"));
 }
 
+fn hash(rocks: &Rocks, max: usize) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    for x in 0..max {
+        for y in 0..max {
+            if rocks.contains(&(x, y)) {
+                hasher.write_usize(x);
+                hasher.write_usize(y);
+            }
+        }
+    }
+    hasher.finish()
+}
+
 fn tilt((blocks, rocks): State) -> State {
-    let mut new_rocks = rocks.clone();
+    let mut new_rocks = Rocks::new();
 
     for rock in &rocks {
-        if !new_rocks.contains(rock) {
-            continue;
+        if new_rocks.contains(rock) {
+            let mut target = rock.1 + 1;
+            while new_rocks.contains(&(rock.0, target)) {
+                target += 1
+            }
+            new_rocks.insert((rock.0, target));
+        } else {
+            roll_up(&blocks, &mut new_rocks, rock);
         }
-        roll_up(&blocks, &mut new_rocks, rock);
     }
 
     (blocks, new_rocks)
@@ -56,22 +100,33 @@ fn tilt((blocks, rocks): State) -> State {
 
 fn roll_up(blocks: &Blocks, rocks: &mut Rocks, &(x, y): &Coord) -> usize {
     let mut target = y;
-    rocks.remove(&(x, y));
     let new_y = loop {
         if target == 0 {
             break 0;
         }
-        if blocks.contains(&(x, target - 1)) {
+        if blocks.contains(&(x, target - 1)) || rocks.contains(&(x, target - 1)) {
             break target;
-        }
-        // If we hit another rock, roll it up, then move below it
-        if rocks.contains(&(x, target - 1)) {
-            break roll_up(blocks, rocks, &(x, target - 1)) + 1;
         }
         target -= 1;
     };
     rocks.insert((x, new_y));
     new_y
+}
+
+fn cycle(mut state: State, max: usize) -> State {
+    for _ in 0..4 {
+        state = tilt(state);
+        state = rotate(state, max);
+    }
+    state
+}
+
+fn rotate((blocks, rocks): State, max: usize) -> State {
+    (rotate_coords(blocks, max), rotate_coords(rocks, max))
+}
+
+fn rotate_coords(set: HashSet<Coord>, max: usize) -> HashSet<Coord> {
+    set.into_iter().map(|(x, y)| (max - y - 1, x)).collect()
 }
 
 fn sum((_, rocks): &State, max_y: usize) -> u32 {
