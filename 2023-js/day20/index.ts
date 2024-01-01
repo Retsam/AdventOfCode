@@ -52,6 +52,9 @@ for (const module of Object.values(modules)) {
   });
 }
 
+const watchPart2 = new Set(["bh", "jf", "mz", "sh"]);
+const part2SignalsTimes: number[] = [];
+
 type Signal = { source: string; target: string; state: 0 | 1 };
 
 const signals: Signal[] = [];
@@ -63,11 +66,10 @@ function sendSignals(state: 0 | 1, { name, outputs }: BaseModule) {
 
 function handleSignal(signal: Signal) {
   signalCounts[signal.state]++;
-  //   console.log(
-  //     `${signal.source} -${signal.state === 0 ? "low" : "high"}-> ${
-  //       signal.target
-  //     }`
-  //   );
+  if (watchPart2.has(signal.source) && signal.state === 1) {
+    watchPart2.delete(signal.source);
+    part2SignalsTimes.push(pressCount);
+  }
   const module = modules[signal.target];
   if (!module) return;
 
@@ -101,3 +103,12 @@ function runCycle() {
 
 Array.from({ length: 1000 }, (_, i) => i).forEach(() => runCycle());
 console.log(signalCounts[0] * signalCounts[1]);
+
+while (watchPart2.size > 0) {
+  runCycle();
+}
+
+const gcd = (a: number, b: number): number => (b == 0 ? a : gcd(b, a % b));
+const lcm = (a: number, b: number): number => (a / gcd(a, b)) * b;
+
+console.log(part2SignalsTimes.reduce(lcm, 1));
