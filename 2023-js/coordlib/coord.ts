@@ -44,9 +44,9 @@ export const offsets: Record<Dir, RawCoord> = {
   l: [-1, 0],
 };
 
-export const move = ([x, y]: RawCoord, dir: Dir): Coord => {
+export const move = ([x, y]: RawCoord, dir: Dir, dist = 1): Coord => {
   const [dx, dy] = offsets[dir];
-  return xy(x + dx, y + dy);
+  return xy(x + dx * dist, y + dy * dist);
 };
 
 export const neighbors = ([x, y]: RawCoord) => {
