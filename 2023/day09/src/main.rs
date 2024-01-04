@@ -33,10 +33,10 @@ fn parse_input(input: &str) -> Result<Vec<i32>, ParseIntError> {
     input.split(' ').map(str::parse).collect()
 }
 
-fn solve(line: &[i32], is_part_two: bool) -> Option<i32> {
-    let first = *line.first()?;
+fn solve(line: &[i32], is_part_two: bool) -> Result<i32, Box<dyn error::Error>> {
+    let first = *line.first().ok_or("Input was unexpectedly empty")?;
     if line.iter().all(|&y| y == first) {
-        return Some(first);
+        return Ok(first);
     }
     let last = *line.last().unwrap();
 
