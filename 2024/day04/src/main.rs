@@ -37,17 +37,14 @@ enum Dir {
     DL,
     DR,
 }
-const DIRS: [Dir; 8] = [
-    Dir::U,
-    Dir::R,
-    Dir::D,
-    Dir::L,
-    Dir::UL,
-    Dir::UR,
-    Dir::DL,
-    Dir::DR,
-];
-const DIAGS: [(Dir, Dir); 2] = [(Dir::UR, Dir::DL), (Dir::UL, Dir::DR)];
+const DIRS: [Dir; 8] = const {
+    use Dir::*;
+    [U, R, D, L, UL, UR, DL, DR]
+};
+const DIAGS: [(Dir, Dir); 2] = const {
+    use Dir::*;
+    [(UR, DL), (UL, DR)]
+};
 
 fn main() -> io::Result<()> {
     let mut buffer = String::new();
