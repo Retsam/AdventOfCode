@@ -39,10 +39,9 @@ fn parse_input(input: &str) -> (Vec<Rule>, Vec<Update>) {
 fn is_ordered(must_precede: &HashMap<u32, HashSet<u32>>, update: &Update) -> bool {
     let mut seen = HashSet::<u32>::new();
     for &record in update.iter() {
-        if must_precede
+        if let Some(true) = must_precede
             .get(&record)
             .map(|precede_set| !precede_set.is_disjoint(&seen))
-            .unwrap_or(false)
         {
             return false;
         }
@@ -51,21 +50,25 @@ fn is_ordered(must_precede: &HashMap<u32, HashSet<u32>>, update: &Update) -> boo
     true
 }
 fn sort_update(must_precede: &HashMap<u32, HashSet<u32>>, update: &mut Update) {
-    let mut to_add = HashSet::from_iter(update.drain(..));
-    while !to_add.is_empty() {
-        let new_to_add = *to_add
+    // Empty the array into a HashSet and rebuild it
+    let mut items_to_insert = HashSet::from_iter(update.drain(..));
+    while !items_to_insert.is_empty() {
+        let add_next = *items_to_insert
             .iter()
-            .find(|&&u| {
+            .find(|item| {
+                // Find an item that doesn't have to come before anything else still in the set
+                //     Either it has no rules: `unwrap_or(true)`
+                //       or else the rules set doesn't overlap with anything still to insert
                 must_precede
-                    .get(&u)
-                    .map(|precede_set| precede_set.is_disjoint(&to_add))
+                    .get(item)
+                    .map(|precede_set| precede_set.is_disjoint(&items_to_insert))
                     .unwrap_or(true)
             })
             .expect("Couldn't find one to add");
-        to_add.remove(&new_to_add);
+        items_to_insert.remove(&add_next);
         // This is actually backwards - we find each each element that should be first, but we're pushing it at the end
         // but we only actually need the midpoint so reversed is just as good
-        update.push(new_to_add);
+        update.push(add_next);
     }
 }
 
