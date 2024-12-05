@@ -10,8 +10,8 @@ struct Rule {
 }
 type Update = Vec<u32>;
 
-fn parse_input(input: &str) -> Option<(Vec<Rule>, Vec<Update>)> {
-    let (rules, updates) = input.trim().splitn(2, "\n\n").collect_tuple()?;
+fn parse_input(input: &str) -> (Vec<Rule>, Vec<Update>) {
+    let (rules, updates) = input.trim().splitn(2, "\n\n").collect_tuple().unwrap();
 
     let rules = rules
         .split("\n")
@@ -33,7 +33,7 @@ fn parse_input(input: &str) -> Option<(Vec<Rule>, Vec<Update>)> {
                 .collect_vec()
         })
         .collect_vec();
-    Some((rules, updates))
+    (rules, updates)
 }
 
 fn is_ordered(must_precede: &HashMap<u32, HashSet<u32>>, update: &Update) -> bool {
@@ -50,12 +50,8 @@ fn is_ordered(must_precede: &HashMap<u32, HashSet<u32>>, update: &Update) -> boo
     }
     true
 }
-fn fix_update(must_precede: &HashMap<u32, HashSet<u32>>, update: &Update) -> Update {
-    let mut new_update = Update::with_capacity(update.len());
-    let mut to_add = HashSet::new();
-    for update in update.iter() {
-        to_add.insert(*update);
-    }
+fn sort_update(must_precede: &HashMap<u32, HashSet<u32>>, update: &mut Update) {
+    let mut to_add = HashSet::from_iter(update.drain(..));
     while !to_add.is_empty() {
         let new_to_add = *to_add
             .iter()
@@ -69,19 +65,18 @@ fn fix_update(must_precede: &HashMap<u32, HashSet<u32>>, update: &Update) -> Upd
         to_add.remove(&new_to_add);
         // This is actually backwards - we find each each element that should be first, but we're pushing it at the end
         // but we only actually need the midpoint so reversed is just as good
-        new_update.push(new_to_add);
+        update.push(new_to_add);
     }
-    new_update
 }
 
-fn get_midpoint(update: &Update) -> u32 {
+fn get_midpoint(update: Update) -> u32 {
     let midpoint = (update.len() - 1) / 2;
     *update.get(midpoint).expect("Failed to get midpoint")
 }
 fn main() -> io::Result<()> {
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
-    let (rules, updates) = parse_input(&buffer).unwrap();
+    let (rules, updates) = parse_input(&buffer);
 
     let mut must_precede: HashMap<u32, HashSet<u32>> = HashMap::new();
     for rule in rules {
@@ -95,11 +90,11 @@ fn main() -> io::Result<()> {
         .into_iter()
         .partition(|u| is_ordered(&must_precede, u));
 
-    let part1: u32 = correct.iter().map(get_midpoint).sum();
+    let part1: u32 = correct.into_iter().map(get_midpoint).sum();
     let part2: u32 = incorrect
         .into_iter()
-        .map(|u| fix_update(&must_precede, &u))
-        .map(|u| get_midpoint(&u))
+        .update(|u| sort_update(&must_precede, u))
+        .map(get_midpoint)
         .sum();
 
     println!("Part 1: {part1}\nPart 2: {part2}");
