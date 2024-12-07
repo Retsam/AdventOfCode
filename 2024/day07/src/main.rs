@@ -1,5 +1,12 @@
 use itertools::Itertools;
 use std::io::{self, Read};
+
+#[derive(Clone, Copy, PartialEq)]
+enum Part {
+    One,
+    Two,
+}
+
 fn main() -> io::Result<()> {
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
@@ -17,14 +24,19 @@ fn main() -> io::Result<()> {
 
     let part1: u64 = input
         .iter()
-        .filter(|(target, vals)| test(*target, vals[0], &vals[1..]))
+        .filter(|(target, vals)| insert_opr(*target, vals[0], &vals[1..], Part::One))
         .map(|(target, _)| target)
         .sum();
-    println!("Part 1: {}", part1);
+    let part2: u64 = input
+        .iter()
+        .filter(|(target, vals)| insert_opr(*target, vals[0], &vals[1..], Part::Two))
+        .map(|(target, _)| target)
+        .sum();
+    println!("Part 1: {part1}\nPart 2: {part2}");
     Ok(())
 }
 
-fn test(target: u64, current: u64, vals: &[u64]) -> bool {
+fn insert_opr(target: u64, current: u64, vals: &[u64], part: Part) -> bool {
     if current > target {
         return false;
     }
@@ -32,9 +44,11 @@ fn test(target: u64, current: u64, vals: &[u64]) -> bool {
         return current == target;
     }
     let next = vals[0];
-    let concat = format!("{current}{next}")
-        .parse()
-        .map(|new_val| test(target, new_val, &vals[1..]))
-        .unwrap_or(false);
-    concat || test(target, current * next, &vals[1..]) || test(target, current + next, &vals[1..])
+    let recurse = |new_val| insert_opr(target, new_val, &vals[1..], part);
+    let concat = part == Part::Two
+        && format!("{current}{next}")
+            .parse()
+            .map(recurse)
+            .unwrap_or(false);
+    concat || recurse(current * next) || recurse(current + next)
 }
