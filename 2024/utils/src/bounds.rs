@@ -38,7 +38,7 @@ impl Bounds {
             && coord.y < self.min_y + self.h
     }
 
-    pub fn debug<F>(&self, cb: F) -> String
+    pub fn debug<F>(&self, cb: F)
     where
         F: Fn(Coord) -> String,
     {
@@ -51,6 +51,6 @@ impl Bounds {
             }
             res.push('\n');
         }
-        res
+        println!("{res}");
     }
 }

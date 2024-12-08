@@ -1,8 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error;
 use std::io::{self, Read};
 
-use colored::Colorize;
 use utils::bounds::Bounds;
 use utils::coord::Coord;
 
@@ -16,52 +15,45 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     let bounds = Bounds::from_vec(&grid);
     let mut antennae = HashMap::<Coord, char>::new();
-    let mut antinodes = HashMap::<Coord, char>::new();
+    let mut part1_anodes = HashSet::<Coord>::new();
+    let mut part2_anodes = HashSet::<Coord>::new();
 
     let get = |c: Coord| {
         grid.get(c.y as usize)
             .and_then(|row| row.get(c.x as usize).cloned())
     };
-    for c in bounds.iter() {
-        let ant = get(c).unwrap();
+    for (c, ant) in bounds.iter().map(|c| (c, get(c).unwrap())) {
         if ant != '.' {
             antennae.insert(c, ant);
         }
     }
 
-    for (c1, &n) in antennae.iter() {
-        for (c2, _) in antennae.iter().filter(|(c2, n2)| c1 != *c2 && **n2 == n) {
-            let del = (c1.x - c2.x, c1.y - c2.y);
-            let a1 = Coord {
-                x: c1.x + del.0,
-                y: c1.y + del.1,
+    for (i, (c1, &freq)) in antennae.iter().enumerate() {
+        for (c2, _) in antennae
+            .iter()
+            .skip(i + 1)
+            .filter(|(_, &freq2)| freq2 == freq)
+        {
+            let del = Coord::from((c2.x - c1.x, c2.y - c1.y));
+
+            let mut walk = |mut coord, dx, dy| {
+                let mut step = 0;
+                while bounds.in_bounds(coord) {
+                    if step == 1 {
+                        part1_anodes.insert(coord);
+                    }
+                    part2_anodes.insert(coord);
+                    step += 1;
+                    coord.x += dx;
+                    coord.y += dy;
+                }
             };
-            let a2 = Coord {
-                x: c2.x - del.0,
-                y: c2.y - del.1,
-            };
-            if bounds.in_bounds(a1) {
-                antinodes.insert(a1, n);
-            }
-            if bounds.in_bounds(a2) {
-                antinodes.insert(a2, n);
-            }
+            walk(*c2, del.x, del.y);
+            walk(*c1, -del.x, -del.y);
         }
     }
 
-    println!(
-        "{}",
-        bounds.debug(|c| {
-            let char = antennae.get(&c).unwrap_or(&'.').to_string();
-            (if antinodes.contains_key(&c) {
-                char.bright_red()
-            } else {
-                char.white()
-            })
-            .to_string()
-        })
-    );
-    let part1 = antinodes.len();
-    println!("Part 1: {}\nPart 2: {}", part1, 0);
+    let (part1, part2) = (part1_anodes.len(), part2_anodes.len());
+    println!("Part 1: {part1}\nPart 2: {part2}",);
     Ok(())
 }

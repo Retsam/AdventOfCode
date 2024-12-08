@@ -24,3 +24,8 @@ impl Coord {
         }
     }
 }
+impl From<(i64, i64)> for Coord {
+    fn from((x, y): (i64, i64)) -> Self {
+        Coord { x, y }
+    }
+}
