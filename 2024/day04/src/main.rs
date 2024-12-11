@@ -1,48 +1,14 @@
+use itertools::Itertools;
 use std::io::{self, Read};
 
-use itertools::Itertools;
-
-#[derive(Debug, Clone, Copy)]
-struct Coord {
-    x: i64,
-    y: i64,
-}
-impl Coord {
-    fn mv(&self, dir: Dir) -> Coord {
-        use Dir::*;
-        Coord {
-            x: self.x
-                + match dir {
-                    L | UL | DL => -1,
-                    R | UR | DR => 1,
-                    _ => 0,
-                },
-            y: self.y
-                + match dir {
-                    U | UL | UR => -1,
-                    D | DL | DR => 1,
-                    _ => 0,
-                },
-        }
-    }
-}
-#[derive(Copy, Clone)]
-enum Dir {
-    L,
-    R,
-    U,
-    D,
-    UL,
-    UR,
-    DL,
-    DR,
-}
-const DIRS: [Dir; 8] = const {
-    use Dir::*;
-    [U, R, D, L, UL, UR, DL, DR]
+use utils::{
+    bounds::Bounds,
+    coord::Coord,
+    dir8::{Dir8, DIRS8},
 };
-const DIAGS: [(Dir, Dir); 2] = const {
-    use Dir::*;
+
+const DIAGS: [(Dir8, Dir8); 2] = const {
+    use Dir8::*;
     [(UR, DL), (UL, DR)]
 };
 
@@ -59,13 +25,11 @@ fn main() -> io::Result<()> {
             .and_then(|row| row.get(c.x as usize).cloned())
     };
 
-    let grid_iter = (0..grid[0].len() as i64)
-        .cartesian_product(0..grid.len() as i64)
-        .map(|(x, y)| Coord { x, y });
+    let bounds = Bounds::from_vec(&grid);
 
     let mut p1_count = 0;
-    for start in grid_iter.clone().filter(|start| get(*start) == Some('X')) {
-        for d in DIRS {
+    for start in bounds.iter().filter(|start| get(*start) == Some('X')) {
+        for d in DIRS8 {
             let m = start.mv(d);
             let a = m.mv(d);
             let s = a.mv(d);
@@ -76,8 +40,9 @@ fn main() -> io::Result<()> {
     }
     println!("Part 1: {}", p1_count);
 
-    let p2_count = grid_iter
-        .filter(|start| get(*start) == Some('X'))
+    let p2_count = bounds
+        .iter()
+        .filter(|start| get(*start) == Some('A'))
         .filter(|start| {
             DIAGS.into_iter().all(|(a, b)| {
                 get(start.mv(a)) == Some('M') && get(start.mv(b)) == Some('S')

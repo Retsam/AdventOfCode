@@ -4,7 +4,7 @@ use std::io::{self, Read};
 
 use utils::bounds::Bounds;
 use utils::coord::Coord;
-use utils::dir::Dir;
+use utils::dir::Neighbors;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let mut buffer = String::new();
@@ -44,7 +44,7 @@ fn walk(grid: &Vec<Vec<u32>>, pos: Coord, found: &mut HashSet<Coord>) -> u32 {
         return 1;
     }
 
-    Dir::neighbors(&pos)
+    pos.neighbors()
         .iter()
         .map(|d| pos.mv(*d))
         .filter(|c| get(*c) == Some(val + 1))
