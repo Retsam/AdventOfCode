@@ -19,7 +19,6 @@ impl Chunks {
         }
     }
     fn find_gap(&self) -> Option<usize> {
-        // self.vec.iter().enumerate().find(|(_, c)| c.data.is_none())
         self.vec.iter().position(|c| c.data.is_none())
     }
     fn partial_fill_gap(&mut self, gap_idx: usize, size: u32, data: u32) {
@@ -80,6 +79,7 @@ fn solve_part1(mut chunks: Chunks) -> u64 {
         } else {
             chunks.fill_gap(gap_idx, data);
         }
+        // If there's leftover adjust the chunk size and put it back
         if last.size > gap_size {
             last.size -= gap_size;
             chunks.vec.push(last);
