@@ -8,6 +8,8 @@ pub enum Dir {
     R,
 }
 
+pub const DIRS: [Dir; 4] = [Dir::U, Dir::D, Dir::L, Dir::R];
+
 impl Dir {
     pub fn cw(&self) -> Dir {
         use Dir::*;
@@ -26,6 +28,9 @@ impl Dir {
             R => U,
             U => L,
         }
+    }
+    pub fn neighbors(coord: &Coord) -> [Coord; 4] {
+        DIRS.map(|d| coord.mv(d))
     }
 }
 
