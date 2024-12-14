@@ -14,6 +14,12 @@ struct Puzzle {
 
 const PART_2_ADD: u64 = 10000000000000;
 
+// A * 94 + B * 22 = 8400
+// A * 34 + B * 67 = 5400
+
+// A = (8400 - B * 22) / 94
+// A * 34 + B * 67 = 5400
+
 fn main() -> Result<(), Box<dyn error::Error>> {
     let mut buf = String::new();
     io::stdin()
@@ -42,18 +48,23 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         })
         .collect_vec();
 
-    let solve = |input: &Vec<Puzzle>| -> u64 {
-        input
-            .iter()
-            .map(|puz| {
-                let best = search(puz);
-                best.unwrap_or(0)
-            })
-            .sum()
-    };
-    let p1 = solve(&input);
+    let p1 = input
+        .iter()
+        .map(|puz| search(puz).unwrap_or(0))
+        .sum::<u64>();
 
-    println!("{p1}");
+    let p2 = input
+        .iter()
+        .map(|puz| {
+            math_it(&Puzzle {
+                prize: (puz.prize.0 + PART_2_ADD, puz.prize.1 + PART_2_ADD),
+                ..*puz
+            })
+            .unwrap_or(0)
+        })
+        .sum::<u64>();
+
+    println!("{p1} {p2}");
     Ok(())
 }
 
@@ -122,4 +133,19 @@ fn search(input: &Puzzle) -> Option<u64> {
         maybe_add((search.presses.0, search.presses.1 + 1));
     }
     None
+}
+
+fn math_it(puz: &Puzzle) -> Option<u64> {
+    let Puzzle {
+        a: (ax, ay),
+        b: (bx, by),
+        prize: (px, py),
+    } = *puz;
+    let a = ((px as f64) / (bx as f64) - (py as f64) / (by as f64))
+        / ((ax as f64) / (bx as f64) - (ay as f64) / (by as f64));
+    let b = (py as f64 - a * ay as f64) / by as f64;
+
+    let a = a.round() as u64;
+    let b = b.round() as u64;
+    (a * ax + b * bx == px && a * ay + b * by == py).then_some(a * 3 + b)
 }
