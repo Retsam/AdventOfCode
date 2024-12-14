@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::error;
 use std::io::{self, Read};
 
-use utils::bounds::Bounds;
 use utils::coord::Coord;
+use utils::grid::Grid;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let mut buf = String::new();
@@ -11,18 +11,13 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .read_to_string(&mut buf)
         .map_err(|_| "Failed to read input")?;
 
-    let grid: Vec<Vec<_>> = buf.lines().map(|line| line.chars().collect()).collect();
+    let grid = Grid::parse(&buf);
 
-    let bounds = Bounds::from_vec(&grid);
     let mut antennae = HashMap::<Coord, char>::new();
     let mut part1_anodes = HashSet::<Coord>::new();
     let mut part2_anodes = HashSet::<Coord>::new();
 
-    let get = |c: Coord| {
-        grid.get(c.y as usize)
-            .and_then(|row| row.get(c.x as usize).cloned())
-    };
-    for (c, ant) in bounds.iter().map(|c| (c, get(c).unwrap())) {
+    for (&ant, c) in grid.iter_with_coord() {
         if ant != '.' {
             antennae.insert(c, ant);
         }
@@ -38,7 +33,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
             let mut walk = |mut coord, dx, dy| {
                 let mut step = 0;
-                while bounds.in_bounds(coord) {
+                while grid.bounds.in_bounds(coord) {
                     if step == 1 {
                         part1_anodes.insert(coord);
                     }

@@ -3,20 +3,9 @@ use std::error;
 use std::io::{self, Read};
 
 use itertools::Itertools;
-use utils::bounds::Bounds;
 use utils::coord::Coord;
 use utils::dir::{Dir, Neighbors};
-
-struct Grid<T> {
-    grid: Vec<Vec<T>>,
-}
-impl<T: Clone> Grid<T> {
-    fn get(&self, c: Coord) -> Option<T> {
-        self.grid
-            .get(c.y as usize)
-            .and_then(|row| row.get(c.x as usize).cloned())
-    }
-}
+use utils::grid::Grid;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let mut buf = String::new();
@@ -24,25 +13,19 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .read_to_string(&mut buf)
         .map_err(|_| "Failed to read input")?;
 
-    let grid = buf
-        .lines()
-        .map(|line| line.chars().collect_vec())
-        .collect_vec();
+    let grid = Grid::parse(&buf);
 
     let mut visited_set = HashSet::<Coord>::new();
 
-    let bounds = Bounds::from_vec(&grid);
-    let grid = Grid { grid };
-    let (p1, p2) = bounds
-        .iter()
-        .map(|coord| {
+    let (p1, p2) = grid
+        .iter_with_coord()
+        .map(|(&sym, coord)| {
             if visited_set.contains(&coord) {
                 return (0, 0);
             }
             visited_set.insert(coord);
 
             let mut region_set = HashSet::new();
-            let sym = grid.get(coord).unwrap();
             let mut peri = 0;
             flood(sym, coord, &mut region_set, &grid, &mut peri);
 
@@ -68,7 +51,7 @@ fn flood(
     grid: &Grid<char>,
     peri: &mut u64,
 ) {
-    if grid.get(coord) != Some(sym) {
+    if grid.get(coord) != Some(&sym) {
         *peri += 1;
         return;
     }
