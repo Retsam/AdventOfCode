@@ -47,6 +47,13 @@ impl<T> Grid<T> {
             .get(c.y as usize)
             .and_then(|row| row.get(c.x as usize))
     }
+    pub fn set(&mut self, c: Coord, data: T) -> bool {
+        if !self.bounds.in_bounds(c) {
+            return false;
+        }
+        self.data[c.y as usize][c.x as usize] = data;
+        true
+    }
     pub fn iter(&self) -> impl Iterator<Item = &T> + '_ {
         self.bounds.iter().map(|c| self.get(c).unwrap())
     }
