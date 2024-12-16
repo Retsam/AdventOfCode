@@ -29,6 +29,9 @@ impl Dir {
             U => L,
         }
     }
+    pub fn is_horiz(&self) -> bool {
+        return self == &Dir::L || self == &Dir::R;
+    }
 }
 
 pub trait Neighbors {

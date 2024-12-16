@@ -47,6 +47,9 @@ impl<T> Grid<T> {
             .get(c.y as usize)
             .and_then(|row| row.get(c.x as usize))
     }
+    pub fn expect(&self, c: Coord) -> &T {
+        self.get(c).expect("Coord out of bounds")
+    }
     pub fn set(&mut self, c: Coord, data: T) -> bool {
         if !self.bounds.in_bounds(c) {
             return false;
