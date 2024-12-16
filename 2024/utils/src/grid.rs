@@ -63,8 +63,11 @@ impl<T> Grid<T> {
     pub fn iter_with_coord(&self) -> impl Iterator<Item = (&T, Coord)> + '_ {
         self.bounds.iter().map(|c| (self.get(c).unwrap(), c))
     }
-    pub fn debug_map(&self, f: impl Fn(&T) -> String) {
-        self.bounds.debug(|c| f(self.get(c).unwrap()))
+    pub fn find_coord(&self, f: impl Fn(&T) -> bool) -> Option<Coord> {
+        self.iter_with_coord().find(|(t, _)| f(t)).map(|(_, c)| c)
+    }
+    pub fn debug_map(&self, f: impl Fn((&T, Coord)) -> String) {
+        self.bounds.debug(|c| f((self.get(c).unwrap(), c)))
     }
 }
 
@@ -83,5 +86,5 @@ fn debug() {
         vec!["g", "h", "i"],
     ]);
     grid.debug();
-    grid.debug_map(|x| x.to_uppercase());
+    grid.debug_map(|(x, _)| x.to_uppercase());
 }
