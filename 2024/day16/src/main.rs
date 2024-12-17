@@ -3,8 +3,8 @@ use std::error;
 use std::io::{self, Read};
 
 use colored::Colorize;
-use itertools::{kmerge, Itertools};
-use utils::coord::{self, Coord};
+use itertools::Itertools;
+use utils::coord::Coord;
 use utils::dir::Dir;
 
 type Grid = utils::grid::Grid<char>;
@@ -15,13 +15,11 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .read_to_string(&mut buf)
         .map_err(|_| "Failed to read input")?;
 
-    let (p1, p2) = (0, 0);
-
     let grid = Grid::parse(&buf);
     let start = grid.find_coord(|c| *c == 'S').expect("No start");
     let goal = grid.find_coord(|c| *c == 'E').expect("No goal");
 
-    let p1 = search(&grid, start, goal);
+    let (p1, p2) = search(&grid, start, goal);
 
     println!("Part 1: {p1}\nPart 2: {p2}");
 
@@ -29,28 +27,35 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-struct SearchEntry {
+struct Node {
     score: u64,
     coord: Coord,
     dir: Dir,
-    prev: Option<Coord>,
+}
+#[derive(Debug, PartialEq, Eq, Clone)]
+struct SearchEntry {
+    node: Node,
+    path: Vec<Coord>,
 }
 impl SearchEntry {
+    fn new_entry(&self, node: Node) -> Self {
+        let mut path = self.path.clone();
+        path.push(node.coord);
+        SearchEntry { node, path }
+    }
     fn forward(&self) -> Self {
-        SearchEntry {
-            score: self.score + 1,
-            coord: self.coord.mv(self.dir),
-            dir: self.dir,
-            prev: Some(self.coord),
-        }
+        self.new_entry(Node {
+            score: self.node.score + 1,
+            coord: self.node.coord.mv(self.node.dir),
+            dir: self.node.dir,
+        })
     }
     fn turn(&self, dir: Dir) -> Self {
-        SearchEntry {
-            score: self.score + 1001,
-            coord: self.coord.mv(dir),
+        self.new_entry(Node {
+            score: self.node.score + 1001,
+            coord: self.node.coord.mv(dir),
             dir,
-            prev: Some(self.coord),
-        }
+        })
     }
 }
 impl PartialOrd for SearchEntry {
@@ -60,66 +65,73 @@ impl PartialOrd for SearchEntry {
 }
 impl Ord for SearchEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.score.cmp(&other.score).reverse()
+        self.node.score.cmp(&other.node.score).reverse()
     }
 }
 
-type VisitedMap = HashMap<Coord, SearchEntry>;
-fn search(grid: &Grid, start: Coord, goal: Coord) -> u64 {
+type VisitedMap = HashMap<(Coord, Dir), Node>;
+fn search(grid: &Grid, start: Coord, goal: Coord) -> (u64, usize) {
+    let start_dir = Dir::R;
     let search_start = SearchEntry {
-        score: 0,
-        coord: start,
-        dir: Dir::R,
-        prev: None,
+        node: Node {
+            score: 0,
+            coord: start,
+            dir: start_dir,
+        },
+        path: vec![start],
     };
-    let mut visited = VisitedMap::from_iter([(start, search_start)]);
+    let mut visited = VisitedMap::from_iter([((start, start_dir), search_start.node)]);
 
     let mut queue = BinaryHeap::<SearchEntry>::new();
     queue.push(search_start);
 
+    let mut best_solution = None;
+    let mut solution_nodes = HashSet::<Coord>::new();
+
     while let Some(entry) = queue.pop() {
         let neighbors = [
             entry.forward(),
-            entry.turn(entry.dir.ccw()),
-            entry.turn(entry.dir.cw()),
+            entry.turn(entry.node.dir.ccw()),
+            entry.turn(entry.node.dir.cw()),
         ];
         for neighbor in neighbors
             .into_iter()
-            .filter(|entry| matches!(grid.get(entry.coord).cloned(), Some('.') | Some('E')))
+            .filter(|entry| matches!(grid.get(entry.node.coord).cloned(), Some('.') | Some('E')))
             .filter(|entry| {
                 visited
-                    .get(&entry.coord)
-                    .map(|&prev| prev.score > entry.score)
+                    .get(&(entry.node.coord, entry.node.dir))
+                    .map(|&prev| prev.score >= entry.node.score)
                     .unwrap_or(true)
             })
             .collect_vec()
         {
-            if neighbor.coord == goal {
-                print_path(grid, start, &neighbor, &visited);
-                return neighbor.score;
+            if neighbor.node.coord == goal {
+                if let Some(best) = best_solution {
+                    if neighbor.node.score > best {
+                        continue;
+                    }
+                }
+                best_solution = Some(neighbor.node.score);
+                // println!("Found goal at {neighbor:?}");
+                solution_nodes.extend(neighbor.path.iter());
+                continue;
             }
-            visited.insert(neighbor.coord, neighbor);
+            if let std::collections::hash_map::Entry::Vacant(e) =
+                visited.entry((neighbor.node.coord, neighbor.node.dir))
+            {
+                e.insert(neighbor.node);
+            }
             queue.push(neighbor);
         }
     }
 
-    panic!("No path found")
+    (best_solution.expect("No path found"), solution_nodes.len())
 }
 
 #[allow(unused)]
-fn print_path(grid: &Grid, start: Coord, entry: &SearchEntry, visited: &VisitedMap) {
-    let mut tile = entry.prev.unwrap();
-    let mut path = HashSet::<Coord>::new();
-    while tile != start {
-        path.insert(tile);
-        tile = visited
-            .get(&tile)
-            .unwrap_or_else(|| panic!("No entry {tile:?}"))
-            .prev
-            .expect("Was None");
-    }
+fn print_path(grid: &Grid, entry: &SearchEntry) {
     grid.debug_map(|(c, coord)| {
-        if path.contains(&coord) {
+        if entry.path.contains(&coord) {
             "*".bright_red().to_string()
         } else {
             c.to_string()
