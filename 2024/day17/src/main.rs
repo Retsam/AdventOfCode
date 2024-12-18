@@ -1,11 +1,11 @@
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
+use std::error;
 use std::io::{self, Read};
-use std::{error, option};
 
 use itertools::Itertools;
 
-type Val = u32;
+type Val = u64;
 #[derive(Debug, PartialEq, Eq)]
 struct Registers {
     a: Val,
@@ -64,10 +64,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     let (mut regs, program) = parse_input(&buf);
 
-    let (p1, p2) = (0, 0);
-
-    // let output = run(&mut regs, &program);
-    // let p1: String = output.into_iter().map(|x| format!("{}", x)).join(",");
+    let output = run(&mut regs, &program);
+    let p1: String = output.into_iter().map(|x| format!("{}", x)).join(",");
 
     let p2 = search(&program);
 
@@ -102,7 +100,7 @@ fn run(regs: &mut Registers, program: &[Op]) -> Vec<Val> {
 
         match ins {
             Ins::Adv => regs.a = div_op(),
-            Ins::Bxl => regs.b ^= op as u32,
+            Ins::Bxl => regs.b ^= op as Val,
             Ins::Bst => {
                 regs.b = combo_op % 8;
             }
@@ -125,11 +123,11 @@ struct SearchNode {
     input_tris: Vec<u8>,
 }
 
-fn combine_tris(tris: impl Iterator<Item = u8>) -> u32 {
-    tris.fold(0, |prev, next| prev << 3 | next as u32)
+fn combine_tris(tris: impl Iterator<Item = u8>) -> u64 {
+    tris.fold(0, |prev, next| prev << 3 | next as u64)
 }
 
-fn search(program: &[Op]) -> u32 {
+fn search(program: &[Op]) -> u64 {
     // let program_rev = program.iter().rev().collect_vec();
     let mut to_test = BinaryHeap::new();
     to_test.push(Reverse(SearchNode { input_tris: vec![] }));
@@ -203,14 +201,14 @@ mod test {
         run(&mut regs, prog);
         assert_eq!(regs, expected);
     }
-    fn test_out(prog: &[Op], mut regs: Registers, expected: Vec<u32>) {
+    fn test_out(prog: &[Op], mut regs: Registers, expected: Vec<Val>) {
         let out = run(&mut regs, prog);
         assert_eq!(out, expected);
     }
     fn test_out_and_regs(
         prog: &[Op],
         mut regs: Registers,
-        expected: Vec<u32>,
+        expected: Vec<Val>,
         expected_regs: Registers,
     ) {
         let out = run(&mut regs, prog);
