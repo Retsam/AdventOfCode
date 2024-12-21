@@ -19,10 +19,14 @@ pub const DIRS8: [Dir8; 8] = const {
 
 pub trait Neighbors {
     fn neighbors(&self) -> [Coord; 8];
+    fn neighbors_with_dir(&self) -> [(Coord, Dir8); 8];
 }
 impl Neighbors for Coord {
     fn neighbors(&self) -> [Coord; 8] {
         DIRS8.map(|d| self.mv(d))
+    }
+    fn neighbors_with_dir(&self) -> [(Coord, Dir8); 8] {
+        DIRS8.map(|d| (self.mv(d), d))
     }
 }
 

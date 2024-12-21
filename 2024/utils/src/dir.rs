@@ -29,17 +29,30 @@ impl Dir {
             U => L,
         }
     }
+    pub fn rev(&self) -> Self {
+        use Dir::*;
+        match self {
+            L => R,
+            D => U,
+            R => L,
+            U => D,
+        }
+    }
     pub fn is_horiz(&self) -> bool {
-        return self == &Dir::L || self == &Dir::R;
+        self == &Dir::L || self == &Dir::R
     }
 }
 
 pub trait Neighbors {
     fn neighbors(&self) -> [Coord; 4];
+    fn neighbors_with_dir(&self) -> [(Coord, Dir); 4];
 }
 impl Neighbors for Coord {
     fn neighbors(&self) -> [Coord; 4] {
         DIRS.map(|d| self.mv(d))
+    }
+    fn neighbors_with_dir(&self) -> [(Coord, Dir); 4] {
+        DIRS.map(|d| (self.mv(d), d))
     }
 }
 
