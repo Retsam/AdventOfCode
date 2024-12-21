@@ -1,5 +1,6 @@
 use crate::coord::Coord;
 
+#[derive(Debug)]
 pub struct Bounds {
     pub min_x: i64,
     pub min_y: i64,

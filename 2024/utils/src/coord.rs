@@ -14,11 +14,17 @@ impl Coord {
             y: self.y + c2.y,
         }
     }
+    pub fn manhattan_dist(&self, c2: &Coord) -> u64 {
+        self.x.abs_diff(c2.x) + self.y.abs_diff(c2.y)
+    }
 }
 
-impl From<(i64, i64)> for Coord {
-    fn from((x, y): (i64, i64)) -> Self {
-        Coord { x, y }
+impl<T: Into<i64>> From<(T, T)> for Coord {
+    fn from((x, y): (T, T)) -> Self {
+        Coord {
+            x: x.into(),
+            y: y.into(),
+        }
     }
 }
 
