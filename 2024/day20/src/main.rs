@@ -1,7 +1,9 @@
+use std::collections::{HashSet, VecDeque};
 use std::error;
 use std::fmt::Display;
 use std::io::{self, Read};
 
+use itertools::Itertools;
 use utils::coord::Coord;
 use utils::dir::{Dir, Neighbors, DIRS};
 
@@ -38,14 +40,14 @@ impl Display for Tile {
     }
 }
 
+const MIN_SHORTCUT: usize = 50; // 50 for example
+
 fn main() -> Result<(), Box<dyn error::Error>> {
     let mut buf = String::new();
     io::stdin()
         .read_to_string(&mut buf)
         .map_err(|_| "Failed to read input")?;
     buf = buf.trim().to_string();
-
-    let (p1, p2) = (0, 0);
 
     let grid = Grid::parse_with(&buf, |c| c.try_into().unwrap());
 
@@ -67,34 +69,73 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     }
 
     let mut skips = vec![];
+    let mut skips2 = vec![];
 
+    // skipping the last three steps, can't have a shortcut when you're two spaces or less from the end
     for (i, step) in path.iter().enumerate().take(path.len() - 3) {
-        // skipping the last three steps, can't have a shortcut when you're two spaces or less from the end
-        let walls = step
+        let mut search = step
             .neighbors()
             .into_iter()
-            .filter(|n| grid.get(*n) == Some(&Tile::Wall));
-        for skip1 in walls {
-            for skip2 in skip1.neighbors() {
-                if skip2 == *step || !grid.bounds.in_bounds(skip2) {
+            .filter(|n| grid.get(*n) == Some(&Tile::Wall))
+            .map(|n| (n, 1))
+            .collect::<VecDeque<_>>();
+
+        let mut visited = HashSet::<Coord>::from_iter(search.iter().map(|(n, _)| *n));
+
+        while let Some((coord, dist)) = search.pop_front() {
+            if grid.get(coord).unwrap() != &Tile::Wall {
+                let j = path
+                    .iter()
+                    .position(|&p| p == coord)
+                    .unwrap_or_else(|| panic!("Found tile not on path, {coord}"));
+                let shortcut = match j.overflowing_sub(i + dist) {
+                    (_, true) => continue,
+                    (x, false) => x,
+                };
+                if dist <= 2 {
+                    skips.push(shortcut);
+                }
+                if shortcut >= MIN_SHORTCUT {
+                    skips2.push(shortcut)
+                }
+            } else {
+                if dist == 20 {
                     continue;
                 }
-                if grid.get(skip2) == Some(&Tile::Wall) {
-                    continue;
-                } else {
-                    let j = path
-                        .iter()
-                        .position(|&p| p == skip2)
-                        .unwrap_or_else(|| panic!("Found tile not on path, {skip2}"));
-                    if j > i + 2 {
-                        skips.push(j - i - 2)
-                    }
+                for next in coord
+                    .neighbors()
+                    .into_iter()
+                    .filter(|&n| grid.bounds.in_bounds(n) && !visited.contains(&n))
+                    .collect_vec()
+                {
+                    visited.insert(next);
+                    search.push_back((next, dist + 1));
                 }
             }
         }
+
+        // for (tile, n) in walls {
+        //     for skip2 in skip1.neighbors() {
+        //         if skip2 == *step || !grid.bounds.in_bounds(skip2) {
+        //             continue;
+        //         }
+        //         if grid.get(skip2) == Some(&Tile::Wall) {
+        //             continue;
+        //         } else {
+        //             let j = path
+        //                 .iter()
+        //                 .position(|&p| p == skip2)
+        //                 .unwrap_or_else(|| panic!("Found tile not on path, {skip2}"));
+        //             if j > i + 2 {
+        //                 skips.push(j - i - 2)
+        //             }
+        //         }
+        //     }
+        // }
     }
 
-    let p1 = skips.into_iter().filter(|&s| s >= 100).count();
+    let p1 = skips.len();
+    let p2 = skips2.len();
     println!("Part 1: {p1}\nPart 2: {p2}");
 
     Ok(())
