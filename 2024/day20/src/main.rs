@@ -1,11 +1,11 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::HashMap;
 use std::error;
 use std::fmt::Display;
 use std::io::{self, Read};
 
 use itertools::Itertools;
 use utils::coord::Coord;
-use utils::dir::{Dir, Neighbors, DIRS};
+use utils::dir::{Dir, DIRS};
 
 type Grid = utils::grid::Grid<Tile>;
 
@@ -40,7 +40,22 @@ impl Display for Tile {
     }
 }
 
-const MIN_SHORTCUT: usize = 50; // 50 for example
+fn coords_within_dist(coord: &Coord, dist: usize) -> impl Iterator<Item = Coord> + '_ {
+    // Note, skipping dist 1 (and 0) as they don't make sense for this problem (reminder if this code is reused)
+    (2..=dist).flat_map(move |offset| coords_at_dist(coord, offset))
+}
+
+fn coords_at_dist(&Coord { x, y }: &Coord, dist: usize) -> impl Iterator<Item = Coord> {
+    (0..(dist as i64)).flat_map(move |offset| {
+        let inv_offset = (dist as i64) - offset;
+        [
+            Coord::new(x + offset, y + inv_offset),
+            Coord::new(x + inv_offset, y - offset),
+            Coord::new(x - offset, y - inv_offset),
+            Coord::new(x - inv_offset, y + offset),
+        ]
+    })
+}
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let mut buf = String::new();
@@ -50,6 +65,8 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     buf = buf.trim().to_string();
 
     let grid = Grid::parse_with(&buf, |c| c.try_into().unwrap());
+
+    let min_shortcut = if grid.bounds.w > 20 { 100 } else { 1 };
 
     let is_next = |tile: Coord, dir: &Dir| grid.get(tile.mv(*dir)).unwrap() != &Tile::Wall;
 
@@ -68,74 +85,57 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         path.push(tile);
     }
 
-    let mut skips = vec![];
-    let mut skips2 = vec![];
+    let mut skips = HashMap::<usize, usize>::new();
+    let mut skips2 = HashMap::<usize, usize>::new();
 
     // skipping the last three steps, can't have a shortcut when you're two spaces or less from the end
-    for (i, step) in path.iter().enumerate().take(path.len() - 3) {
-        let mut search = step
-            .neighbors()
-            .into_iter()
-            .filter(|n| grid.get(*n) == Some(&Tile::Wall))
-            .map(|n| (n, 1))
-            .collect::<VecDeque<_>>();
+    for (i, from) in path.iter().enumerate().take(path.len() - 3) {
+        for to in coords_within_dist(from, 20) {
+            if !grid.bounds.in_bounds(to) || grid.get(to) == Some(&Tile::Wall) {
+                continue;
+            }
 
-        let mut visited = HashSet::<Coord>::from_iter(search.iter().map(|(n, _)| *n));
+            let j = path
+                .iter()
+                .position(|&p| p == to)
+                .unwrap_or_else(|| panic!("Found tile not on path, {to}"));
 
-        while let Some((coord, dist)) = search.pop_front() {
-            if grid.get(coord).unwrap() != &Tile::Wall {
-                let j = path
-                    .iter()
-                    .position(|&p| p == coord)
-                    .unwrap_or_else(|| panic!("Found tile not on path, {coord}"));
-                let shortcut = match j.overflowing_sub(i + dist) {
-                    (_, true) => continue,
-                    (x, false) => x,
-                };
-                if dist <= 2 {
-                    skips.push(shortcut);
-                }
-                if shortcut >= MIN_SHORTCUT {
-                    skips2.push(shortcut)
-                }
-            } else {
-                if dist == 20 {
-                    continue;
-                }
-                for next in coord
-                    .neighbors()
-                    .into_iter()
-                    .filter(|&n| grid.bounds.in_bounds(n) && !visited.contains(&n))
-                    .collect_vec()
-                {
-                    visited.insert(next);
-                    search.push_back((next, dist + 1));
-                }
+            let dist = from.manhattan_dist(&to) as usize;
+
+            let shortcut = match j.overflowing_sub(i + dist) {
+                (_, true) => continue,
+                (0, false) => continue,
+                (x, false) => x,
+            };
+
+            if shortcut < min_shortcut {
+                continue;
+            }
+
+            if dist <= 2 {
+                *skips.entry(shortcut).or_default() += 1;
+            }
+            // This check is purely for the example since min_shortcut is already > 50
+            if shortcut >= 50 {
+                *skips2.entry(shortcut).or_default() += 1;
             }
         }
-
-        // for (tile, n) in walls {
-        //     for skip2 in skip1.neighbors() {
-        //         if skip2 == *step || !grid.bounds.in_bounds(skip2) {
-        //             continue;
-        //         }
-        //         if grid.get(skip2) == Some(&Tile::Wall) {
-        //             continue;
-        //         } else {
-        //             let j = path
-        //                 .iter()
-        //                 .position(|&p| p == skip2)
-        //                 .unwrap_or_else(|| panic!("Found tile not on path, {skip2}"));
-        //             if j > i + 2 {
-        //                 skips.push(j - i - 2)
-        //             }
-        //         }
-        //     }
-        // }
     }
 
-    let p1 = skips.len();
-    let p2 = skips2.len();
+    #[allow(unused)]
+    fn debug(skips: &HashMap<usize, usize>) {
+        let mut res = skips.iter().collect_vec();
+        res.sort_by(|a, b| a.0.cmp(b.0));
+        for (k, v) in res {
+            if *v == 1 {
+                println!("There is one cheat that save {k} picoseconds");
+            } else {
+                println!("There are {v} cheats that save {k} picoseconds");
+            }
+        }
+    }
+    let p1: usize = skips.drain().map(|(_, v)| v).sum();
+    let p2: usize = skips2.drain().map(|(_, v)| v).sum();
     println!("Part 1: {p1}\nPart 2: {p2}");
 
     Ok(())
