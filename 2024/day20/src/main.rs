@@ -40,23 +40,6 @@ impl Display for Tile {
     }
 }
 
-fn coords_within_dist(coord: &Coord, dist: usize) -> impl Iterator<Item = Coord> + '_ {
-    // Note, skipping dist 1 (and 0) as they don't make sense for this problem (reminder if this code is reused)
-    (2..=dist).flat_map(move |offset| coords_at_dist(coord, offset))
-}
-
-fn coords_at_dist(&Coord { x, y }: &Coord, dist: usize) -> impl Iterator<Item = Coord> {
-    (0..(dist as i64)).flat_map(move |offset| {
-        let inv_offset = (dist as i64) - offset;
-        [
-            Coord::new(x + offset, y + inv_offset),
-            Coord::new(x + inv_offset, y - offset),
-            Coord::new(x - offset, y - inv_offset),
-            Coord::new(x - inv_offset, y + offset),
-        ]
-    })
-}
-
 fn main() -> Result<(), Box<dyn error::Error>> {
     let mut buf = String::new();
     io::stdin()
@@ -89,35 +72,23 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let mut skips2 = HashMap::<usize, usize>::new();
 
     // skipping the last three steps, can't have a shortcut when you're two spaces or less from the end
-    for (i, from) in path.iter().enumerate().take(path.len() - 3) {
-        for to in coords_within_dist(from, 20) {
-            if !grid.bounds.in_bounds(to) || grid.get(to) == Some(&Tile::Wall) {
-                continue;
-            }
-
-            let j = path
-                .iter()
-                .position(|&p| p == to)
-                .unwrap_or_else(|| panic!("Found tile not on path, {to}"));
-
-            let dist = from.manhattan_dist(&to) as usize;
-
-            let shortcut = match j.overflowing_sub(i + dist) {
+    for (i, from) in path.iter().enumerate().take(path.len() - min_shortcut) {
+        for (j, to) in path.iter().enumerate().skip(i + min_shortcut + 2) {
+            let dist = to.manhattan_dist(from);
+            let shortcut = match (j - i).overflowing_sub(dist as usize) {
+                (0, _) => continue,
                 (_, true) => continue,
-                (0, false) => continue,
-                (x, false) => x,
+                (shortcut, _) => shortcut,
             };
-
             if shortcut < min_shortcut {
                 continue;
             }
-
-            if dist <= 2 {
-                *skips.entry(shortcut).or_default() += 1;
+            if dist == 2 {
+                skips.entry(shortcut).and_modify(|v| *v += 1).or_insert(1);
             }
-            // This check is purely for the example since min_shortcut is already > 50
-            if shortcut >= 50 {
-                *skips2.entry(shortcut).or_default() += 1;
+            if dist <= 20 && shortcut >= 50 {
+                // >= 50 is for the example - which only shows >= 50 output for part 2, despite showing all shortcuts for part 1
+                skips2.entry(shortcut).and_modify(|v| *v += 1).or_insert(1);
             }
         }
     }
