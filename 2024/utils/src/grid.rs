@@ -66,7 +66,7 @@ impl<T> Grid<T> {
     pub fn find_coord(&self, f: impl Fn(&T) -> bool) -> Option<Coord> {
         self.iter_with_coord().find(|(t, _)| f(t)).map(|(_, c)| c)
     }
-    pub fn debug_map(&self, f: impl Fn((&T, Coord)) -> String) {
+    pub fn debug_map<U: ToString>(&self, f: impl Fn((&T, Coord)) -> U) {
         self.bounds.debug(|c| f((self.get(c).unwrap(), c)))
     }
 }

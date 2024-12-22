@@ -39,15 +39,15 @@ impl Bounds {
             && coord.y < self.min_y + self.h
     }
 
-    pub fn debug<F>(&self, cb: F)
+    pub fn debug<F, S: ToString>(&self, cb: F)
     where
-        F: Fn(Coord) -> String,
+        F: Fn(Coord) -> S,
     {
         let mut res = String::new();
         for y in self.range_y() {
             for x in self.range_x() {
                 let coord = Coord { x, y };
-                let char = cb(coord);
+                let char = cb(coord).to_string();
                 res.push_str(&char);
             }
             res.push('\n');
