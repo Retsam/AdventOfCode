@@ -1,10 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::error;
-use std::hash::Hash;
 use std::io::{self, Read};
 
 use itertools::Itertools;
-use petgraph::Graph;
 
 fn parse_input(str: &str) -> Vec<(String, String)> {
     str.lines()
@@ -17,10 +15,10 @@ fn parse_input(str: &str) -> Vec<(String, String)> {
         .collect_vec()
 }
 
+type Connections = HashMap<Node, HashSet<Node>>;
 type Node = String;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
-    let (p1, p2) = (0, 0);
     let mut buf = String::new();
     io::stdin()
         .read_to_string(&mut buf)
@@ -33,7 +31,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .unique()
         .collect_vec();
     let edges: HashSet<(Node, Node)> = input.iter().cloned().collect();
-    let mut connections: HashMap<Node, HashSet<Node>> = HashMap::new();
+    let mut connections: Connections = HashMap::new();
     for (a, b) in edges.iter() {
         connections.entry(a.clone()).or_default().insert(b.clone());
         connections.entry(b.clone()).or_default().insert(a.clone());
@@ -63,6 +61,28 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         .iter()
         .filter(|nodes| nodes.iter().any(|n| n.starts_with('t')))
         .count();
+
+    let mut counts = HashMap::<String, usize>::new();
+
+    // I know from playing with the input that it's a 13-element set, out of a possible 14 connections that
+    // each node has.  This makes it easy to search for
+    for node in all_nodes.iter() {
+        let others = connections.get(node).unwrap();
+        for minus in others.iter() {
+            let x = others
+                .iter()
+                .filter(|o| o != &minus)
+                .chain(&[node.to_string()])
+                .sorted()
+                .join(",");
+            *counts.entry(x).or_default() += 1;
+        }
+    }
+    let p2 = counts
+        .into_iter()
+        .max_by(|(_, v1), (_, v2)| v1.cmp(v2))
+        .unwrap()
+        .0;
 
     println!("Part 1: {p1}\nPart 2: {p2}");
 
