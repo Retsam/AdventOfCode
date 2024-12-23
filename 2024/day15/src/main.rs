@@ -83,13 +83,12 @@ fn _main(buf: String) -> Result<(), Box<dyn error::Error>> {
         })
         .collect_vec();
 
-    let (p1, p2) = (0, 0);
-    // let p1 = solve(
-    //     Grid::parse_with(map_s, |c| {
-    //         Tile::parse(c).unwrap_or_else(|| panic!("Unexpected {c}"))
-    //     }),
-    //     &moves,
-    // );
+    let p1 = solve(
+        Grid::parse_with(map_s, |c| {
+            Tile::parse(c).unwrap_or_else(|| panic!("Unexpected {c}"))
+        }),
+        &moves,
+    );
 
     let part2_data = map_s
         .trim()
@@ -107,17 +106,11 @@ fn _main(buf: String) -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
-fn solve(mut grid: Grid<Tile>, moves: &Vec<Dir>) -> i64 {
-    let mut coord = grid
-        .iter_with_coord()
-        .find(|(t, _)| **t == Tile::Robot)
-        .unwrap()
-        .1;
+fn solve(mut grid: Grid<Tile>, moves: &[Dir]) -> i64 {
+    let mut coord = grid.find_coord(|t| *t == Tile::Robot).unwrap();
 
-    for &dir in moves {
+    for &dir in moves.iter() {
         do_move(&mut grid, &mut coord, dir);
-        println!("{dir:?}");
-        grid.debug();
     }
 
     grid.iter_with_coord()
@@ -145,8 +138,8 @@ fn try_push(grid: &mut Grid<Tile>, from: Coord, dir: Dir) -> bool {
         }
     }
     assert!(tile == BoxL || tile == BoxR);
-    // Part 2 - horizontal
     match dir {
+        // Part 2 - horizontal
         Dir::L | Dir::R => {
             let mut dest = from.mv(dir);
             let mut box_coords = vec![];
@@ -165,6 +158,7 @@ fn try_push(grid: &mut Grid<Tile>, from: Coord, dir: Dir) -> bool {
                 false
             }
         }
+        // Part 2 - vertical
         _ => try_vert_push(grid, from, dir)
             .map(|push| push.exec(grid))
             .is_some(),
@@ -179,6 +173,12 @@ impl VertPush {
     fn exec(self, grid: &mut Grid<Tile>) {
         for push in self.depends_on {
             push.exec(grid);
+        }
+        if grid.get(self.start.0) == Some(&Tile::Empty)
+            || grid.get(self.start.1) == Some(&Tile::Empty)
+        {
+            // Might have already been moved, e.g. a pyramid formation
+            return;
         }
         grid.set(self.dest.0, *grid.expect(self.start.0));
         grid.set(self.dest.1, *grid.expect(self.start.1));
@@ -274,5 +274,21 @@ fn push_vert_2() {
 #######
 
 ^^"#;
+    _main(input.to_string()).unwrap();
+}
+
+#[test]
+fn push_vert_bug() {
+    let input = r#"
+#######
+#..@..#
+#..O..#
+#.OO..#
+#.OOO.#
+#.....#
+#######
+
+<<<vv>^^>>v
+"#;
     _main(input.to_string()).unwrap();
 }
