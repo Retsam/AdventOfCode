@@ -2,6 +2,7 @@ use itertools::Itertools;
 use std::collections::HashSet;
 use std::error;
 use std::io::{self, Read};
+use std::ops::RangeInclusive;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let mut buf = String::new();
@@ -49,7 +50,12 @@ fn repeat(s: u64, times: usize) -> u64 {
         .unwrap()
 }
 
-fn solve(lower: u64, upper: u64, size: usize) -> HashSet<u64> {
+// Calcluates the possible range of starting numbers to repeat.
+// Examples:
+// 60-80, size=2 -> [6, 8] - later check will eliminate 88 as not-in-range
+// 88-130, size=2 -> [8, 9]  - stops before going to three digits because size is 2
+// 600-1200, size=2 -> [10, 12] - ignores 600-999 because no two-digit repeated numbers can fit there
+fn calculate_bounds(lower: u64, upper: u64, size: usize) -> Option<RangeInclusive<u64>> {
     let lower_str = lower.to_string();
     let upper_str = upper.to_string();
     let lower_len = lower_str.len();
@@ -57,28 +63,35 @@ fn solve(lower: u64, upper: u64, size: usize) -> HashSet<u64> {
 
     // Early return if neither bound is a multiple of size
     // (The input does not include ranges across more than one order of magnitude, e.g. 99-101 is possible, but 99-1010 is not)
+    // If not for this, we'd have to consider the case where some length *between* upper_len and lower_len is a multiple
     if lower_len % size != 0 && upper_len % size != 0 {
-        return HashSet::new();
+        return None;
     }
 
     let lower_bound = if lower_len % size == 0 {
         let start = &lower_str[0..(lower_len / size)];
         start.parse::<u64>().unwrap()
     } else {
-        // e.g. 888 - 2000, with size 2, the lower-limit is 10 (i.e. 1010)
         10u64.pow(upper_len as u32 / 2 - 1)
     };
     let upper_bound = if upper_len % size == 0 {
         let start = &upper_str[0..(upper_len / size)];
         start.parse::<u64>().unwrap()
     } else {
-        // e.g. 8888-10100, with size 2, the upper-limit is 99 (i.e. 9999)
         10u64.pow(lower_len as u32 / 2) - 1
     };
 
-    (lower_bound..=upper_bound)
-        .into_iter()
-        .map(|n| repeat(n, size))
-        .filter(|candidate| (lower..=upper).contains(candidate))
-        .collect()
+    Some(lower_bound..=upper_bound)
+}
+
+fn solve(lower: u64, upper: u64, size: usize) -> HashSet<u64> {
+    if let Some(bounds) = calculate_bounds(lower, upper, size) {
+        bounds
+            .into_iter()
+            .map(|n| repeat(n, size))
+            .filter(|candidate| (lower..=upper).contains(candidate))
+            .collect()
+    } else {
+        HashSet::new()
+    }
 }
