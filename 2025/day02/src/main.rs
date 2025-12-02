@@ -52,46 +52,53 @@ fn repeat(s: u64, times: usize) -> u64 {
 
 // Calcluates the possible range of starting numbers to repeat.
 // Examples:
-// 60-80, size=2 -> [6, 8] - later check will eliminate 88 as not-in-range
+// 60-89, size=2 -> [6, 8]
+// 69-80, size=2 -> [7, 7] - 6 was eliminated because 66 < 69, 8 was eliminated because 88 > 80
 // 88-130, size=2 -> [8, 9]  - stops before going to three digits because size is 2
 // 600-1200, size=2 -> [10, 12] - ignores 600-999 because no two-digit repeated numbers can fit there
-fn calculate_bounds(lower: u64, upper: u64, size: usize) -> Option<RangeInclusive<u64>> {
+fn calculate_bounds(lower: u64, upper: u64, size: usize) -> RangeInclusive<u64> {
     let lower_str = lower.to_string();
     let upper_str = upper.to_string();
     let lower_len = lower_str.len();
     let upper_len = upper_str.len();
 
+    let in_range = |candidate| (lower..=upper).contains(&candidate);
+
     // Early return if neither bound is a multiple of size
     // (The input does not include ranges across more than one order of magnitude, e.g. 99-101 is possible, but 99-1010 is not)
     // If not for this, we'd have to consider the case where some length *between* upper_len and lower_len is a multiple
     if lower_len % size != 0 && upper_len % size != 0 {
-        return None;
+        // Intentionally empty range
+        return 2..=1;
     }
 
-    let lower_bound = if lower_len % size == 0 {
+    let mut lower_bound = if lower_len % size == 0 {
         let start = &lower_str[0..(lower_len / size)];
         start.parse::<u64>().unwrap()
     } else {
-        10u64.pow(upper_len as u32 / 2 - 1)
+        10u64.pow(upper_len as u32 / size as u32 - 1)
     };
-    let upper_bound = if upper_len % size == 0 {
+    let mut upper_bound = if upper_len % size == 0 {
         let start = &upper_str[0..(upper_len / size)];
         start.parse::<u64>().unwrap()
     } else {
-        10u64.pow(lower_len as u32 / 2) - 1
+        10u64.pow(lower_len as u32 / size as u32) - 1
     };
 
-    Some(lower_bound..=upper_bound)
+    // We only need to check the end-points for cases like 69-80 - 66 is too low, 88 is too high
+    if !in_range(repeat(lower_bound, size)) {
+        lower_bound += 1;
+    }
+    if !in_range(repeat(upper_bound, size)) {
+        upper_bound -= 1;
+    }
+
+    lower_bound..=upper_bound
 }
 
 fn solve(lower: u64, upper: u64, size: usize) -> HashSet<u64> {
-    if let Some(bounds) = calculate_bounds(lower, upper, size) {
-        bounds
-            .into_iter()
-            .map(|n| repeat(n, size))
-            .filter(|candidate| (lower..=upper).contains(candidate))
-            .collect()
-    } else {
-        HashSet::new()
-    }
+    calculate_bounds(lower, upper, size)
+        .into_iter()
+        .map(|n| repeat(n, size))
+        .collect()
 }
