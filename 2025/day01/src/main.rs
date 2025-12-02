@@ -10,13 +10,12 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let ins = buf
         .lines()
         .map(|line| {
-            let dir = match &line[0..1] {
-                "L" => -1,
-                "R" => 1,
-                _ => panic!("Invalid instruction"),
-            };
             let dist: i32 = line[1..].parse().expect("Invalid number");
-            dir * dist
+            match &line[0..1] {
+                "L" => -dist,
+                "R" => dist,
+                _ => panic!("Invalid instruction"),
+            }
         })
         .collect::<Vec<i32>>();
 
@@ -25,22 +24,29 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     let mut p1 = 0;
     let mut p2 = 0;
 
-    for delta in ins {
-        let mut dist = delta.abs();
-        let step = delta.signum();
+    for mut delta in ins {
+        if delta.abs() >= 100 {
+            p2 += delta.abs() / 100;
+            // We do want remainder here - delta should still be negative if it was negative
+            delta %= 100;
+        }
+        // If we're starting at zero, we can't end up on zero and we won't be passing it
+        // Bail out early to avoid double-counting
+        if val == 0 {
+            val = delta.rem_euclid(100);
+            continue;
+        }
+        val += delta;
 
-        if dist >= 100 {
-            p2 += dist.abs() / 100;
-            dist %= 100;
+        if !(0..=100).contains(&val) {
+            p2 += 1;
         }
-        for _ in 0..dist {
-            val = (val + step) % 100;
-            if val == 0 {
-                p2 += 1;
-            }
-        }
+        // We want modulus here, not remainder, to keep val in the range [0, 100)
+        val = val.rem_euclid(100);
+
         if val == 0 {
             p1 += 1;
+            p2 += 1;
         }
     }
 
